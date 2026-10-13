@@ -1,16 +1,62 @@
-# React + Vite
+# Warehouse Management Module
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Складской модуль
 
-Currently, two official plugins are available:
+Складской модуль предназначен для учёта продуктов в ресторане, управления поставками, партиями, остатками и сроками годности.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Основные возможности
 
-## React Compiler
+- **Дашборд** — сводка о текущем состоянии склада:
+  - количество продуктов;
+  - активные партии;
+  - продукты с истекающим сроком годности;
+  - критические остатки;
+  - списания.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **История поставок** — просмотр всех поставок, дат поступления и состава партий.
 
-## Expanding the ESLint configuration
+- **Список продуктов** — информация о продуктах, их остатках, партиях и сроках годности.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **История заказов** — просмотр всех заказов и анализ использования продуктов.
+
+- **Редактор меню** — управление блюдами, ингредиентами, ценами и доступностью блюд.
+
+- **Ввод поставок** — добавление новых поставок и создание партий продуктов.
+
+- **Панель управления пользователями** — управление пользователями системы и их правами доступа.
+
+## Логика складского учёта
+
+Для каждого продукта учитываются:
+
+- общее количество на складе;
+- отдельные партии;
+- дата поступления;
+- срок годности;
+- количество дней до истечения срока;
+- статус продукта.
+
+Статусы продуктов отображаются с помощью цветовой индикации:
+
+- зелёный — продукт в норме;
+- жёлтый — срок годности скоро истекает;
+- красный — продукт просрочен;
+- серый — продукта нет в наличии.
+
+## Технологии
+
+- React
+- Vite
+- Tailwind CSS
+- JavaScript
+
+## Дизайн
+
+Интерфейс выполнен в тёплом минималистичном стиле:
+
+- кремовый фон;
+- белые карточки;
+- скруглённые элементы;
+- оранжевые кнопки;
+- цветовая индикация статусов;
+- боковая панель для навигации между разделами.
