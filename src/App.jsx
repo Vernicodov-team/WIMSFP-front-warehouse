@@ -1,17 +1,17 @@
 import { useState } from "react";
 import Sidebar from "./components/Sidebar";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   const [activePage, setActivePage] = useState("Дашборд");
 
-  return (
-    <div className="min-h-screen bg-[#fff8f1]">
-      <Sidebar
-        activePage={activePage}
-        onPageChange={setActivePage}
-      />
+  function renderPage() {
+    if (activePage === "Дашборд") {
+      return <Dashboard onNavigate={setActivePage} />;
+    }
 
-      <main className="ml-[266px] min-h-screen p-8">
+    return (
+      <main className="min-h-screen bg-[#fff8f1] p-8">
         <div className="rounded-[24px] bg-white p-8 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
           <div className="mb-2 text-[12px] text-[#ad8e7a]">
             Раздел склада
@@ -26,6 +26,17 @@ function App() {
           </p>
         </div>
       </main>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#fff8f1]">
+      <Sidebar
+        activePage={activePage}
+        onPageChange={setActivePage}
+      />
+
+      <div className="ml-[266px]">{renderPage()}</div>
     </div>
   );
 }
