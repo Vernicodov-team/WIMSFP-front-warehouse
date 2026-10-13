@@ -14,13 +14,6 @@ const statistics = [
     iconClass: "bg-[#fff4d8] text-[#c8881b]",
   },
   {
-    title: "Скоро истекает",
-    value: "12",
-    description: "в ближайшие 3 дня",
-    icon: "◷",
-    iconClass: "bg-[#fff0c9] text-[#b8791b]",
-  },
-  {
     title: "Критический остаток",
     value: "7",
     description: "требуют пополнения",
@@ -28,11 +21,14 @@ const statistics = [
     iconClass: "bg-[#ffe1dd] text-[#c84d45]",
   },
   {
-    title: "Списано за месяц",
-    value: "36 кг",
-    description: "на 8% меньше прошлого месяца",
-    icon: "↘",
-    iconClass: "bg-[#e9f3e4] text-[#659251]",
+  title: "Списано за месяц",
+  values: [
+    { value: "36 кг", label: "килограммы" },
+    { value: "18 л", label: "литры" },
+    { value: "42 шт.", label: "штуки" },
+  ],
+  icon: "↘",
+  iconClass: "bg-[#ffe1dd] text-[#c84d45]",
   },
 ];
 
@@ -51,13 +47,6 @@ const attentionItems = [
     icon: "◷",
     iconClass: "bg-[#fff0c9] text-[#b8791b]",
   },
-  {
-    title: "Нет в наличии",
-    value: "7 позиций",
-    description: "влияют на доступность блюд",
-    icon: "—",
-    iconClass: "bg-[#eee9e5] text-[#81746c]",
-  },
 ];
 
 const expirationProducts = [
@@ -66,15 +55,15 @@ const expirationProducts = [
     batch: "П-1038",
     expiration: "14.10.2026",
     remaining: "1 день",
-    status: "Критично",
-    statusClass: "bg-[#ffe1dd] text-[#c84d45]",
+    status: "Скоро истекает",
+    statusClass: "bg-[#fff0c9] text-[#b8791b]",
   },
   {
     product: "Томаты",
     batch: "П-1039",
     expiration: "15.10.2026",
     remaining: "2 дня",
-    status: "Скоро",
+    status: "Скоро истекает",
     statusClass: "bg-[#fff0c9] text-[#b8791b]",
   },
   {
@@ -82,7 +71,7 @@ const expirationProducts = [
     batch: "П-1037",
     expiration: "16.10.2026",
     remaining: "3 дня",
-    status: "Скоро",
+    status: "Скоро истекает",
     statusClass: "bg-[#fff0c9] text-[#b8791b]",
   },
   {
@@ -138,13 +127,34 @@ function Dashboard({ onNavigate }) {
                   </div>
                 </div>
 
-                <div className="text-[30px] font-extrabold tracking-[-0.06em] text-[#3a322d]">
-                  {statistic.value}
-                </div>
+                {statistic.values ? (
+                  <div className="divide-y divide-[#f1e8e1]">
+                    {statistic.values.map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
+                      >
+                        <span className="text-[22px] font-extrabold tracking-[-0.05em] text-[#3a322d]">
+                          {item.value}
+                        </span>
 
-                <div className="mt-1 text-[12px] text-[#a39389]">
-                  {statistic.description}
-                </div>
+                        <span className="text-[11px] text-[#a39389]">
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-[30px] font-extrabold tracking-[-0.06em] text-[#3a322d]">
+                      {statistic.value}
+                    </div>
+
+                    <div className="mt-1 text-[12px] text-[#a39389]">
+                      {statistic.description}
+                    </div>
+                  </>
+                )}
               </article>
             ))}
           </div>
@@ -161,7 +171,7 @@ function Dashboard({ onNavigate }) {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             {attentionItems.map((item) => (
               <article
                 key={item.title}
@@ -202,14 +212,6 @@ function Dashboard({ onNavigate }) {
                 Продукты, которым нужно уделить внимание в первую очередь
               </p>
             </div>
-
-            <button
-                type="button"
-                onClick={() => onNavigate("Список продуктов")}
-                className="rounded-full bg-[#fff0df] px-4 py-2 text-[11px] font-bold text-[#d9671b] transition hover:bg-[#ffe2cb]"
-                >
-                Все продукты
-            </button>
           </div>
 
           <div className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] gap-3 bg-[#fffaf7] px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
