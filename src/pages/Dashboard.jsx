@@ -21,14 +21,31 @@ const statistics = [
     iconClass: "bg-[#ffe1dd] text-[#c84d45]",
   },
   {
-  title: "Списано за месяц",
-  values: [
-    { value: "36 кг", label: "килограммы" },
-    { value: "18 л", label: "литры" },
-    { value: "42 шт.", label: "штуки" },
-  ],
-  icon: "↘",
-  iconClass: "bg-[#ffe1dd] text-[#c84d45]",
+    title: "Списано за месяц",
+    values: [
+      { value: "36 кг", label: "килограммы" },
+      { value: "18 л", label: "литры" },
+      { value: "42 шт.", label: "штуки" },
+    ],
+    icon: "↘",
+    iconClass: "bg-[#ffe1dd] text-[#c84d45]",
+  },
+  {
+    title: "Финансы за месяц",
+    finance: [
+      {
+        title: "Общая выручка",
+        value: "486 000 ₽",
+        valueClass: "text-[#659251]",
+      },
+      {
+        title: "Общие затраты",
+        value: "214 000 ₽",
+        valueClass: "text-[#c84d45]",
+      },
+    ],
+    icon: "₽",
+    iconClass: "bg-[#fff0df] text-[#d9671b]",
   },
 ];
 
@@ -84,6 +101,49 @@ const expirationProducts = [
   },
 ];
 
+const financeData = [
+  {
+    day: "1 окт.",
+    revenue: 72,
+    expenses: 45,
+  },
+  {
+    day: "5 окт.",
+    revenue: 88,
+    expenses: 52,
+  },
+  {
+    day: "9 окт.",
+    revenue: 64,
+    expenses: 38,
+  },
+  {
+    day: "13 окт.",
+    revenue: 96,
+    expenses: 57,
+  },
+  {
+    day: "17 окт.",
+    revenue: 78,
+    expenses: 48,
+  },
+  {
+    day: "21 окт.",
+    revenue: 91,
+    expenses: 54,
+  },
+  {
+    day: "25 окт.",
+    revenue: 83,
+    expenses: 49,
+  },
+  {
+    day: "31 окт.",
+    revenue: 100,
+    expenses: 62,
+  },
+];
+
 function Dashboard() {
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
@@ -127,7 +187,26 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {statistic.values ? (
+                {statistic.finance ? (
+                  <div className="divide-y divide-[#f1e8e1]">
+                    {statistic.finance.map((item) => (
+                      <div
+                        key={item.title}
+                        className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                      >
+                        <div className="text-[11px] text-[#958278]">
+                          {item.title}
+                        </div>
+
+                        <div
+                          className={`text-[18px] font-extrabold tracking-[-0.04em] ${item.valueClass}`}
+                        >
+                          {item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : statistic.values ? (
                   <div className="divide-y divide-[#f1e8e1]">
                     {statistic.values.map((item) => (
                       <div
@@ -156,6 +235,57 @@ function Dashboard() {
                   </>
                 )}
               </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-[20px] border border-[#f0e2d8] bg-white p-6 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
+          <div className="mb-5 flex items-start justify-between">
+            <div>
+              <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+                Выручка и затраты
+              </h3>
+
+              <p className="mt-1 text-[13px] text-[#a09187]">
+                Сравнение показателей за текущий месяц
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 text-[11px] text-[#81736a]">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#82b274]" />
+                Общая выручка
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e96d1b]" />
+                Общие затраты
+              </div>
+            </div>
+          </div>
+
+          <div className="flex h-[260px] items-end gap-5 border-b border-l border-[#eaded5] px-5 pb-0 pt-5">
+            {financeData.map((item) => (
+              <div
+                key={item.day}
+                className="relative flex h-full flex-1 items-end justify-center gap-2"
+              >
+                <div
+                  className="w-6 rounded-t-md bg-[#82b274] transition hover:bg-[#6d9f60]"
+                  style={{ height: `${item.revenue}%` }}
+                  title={`Выручка: ${item.revenue}`}
+                />
+
+                <div
+                  className="w-6 rounded-t-md bg-[#e96d1b] transition hover:bg-[#d85e12]"
+                  style={{ height: `${item.expenses}%` }}
+                  title={`Затраты: ${item.expenses}`}
+                />
+
+                <span className="absolute translate-y-7 text-[10px] text-[#a09187]">
+                  {item.day}
+                </span>
+              </div>
             ))}
           </div>
         </section>
@@ -202,16 +332,14 @@ function Dashboard() {
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-          <div className="flex items-center justify-between border-b border-[#f3e8e0] px-6 py-5">
-            <div>
-              <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#332d29]">
-                Ближайшие сроки годности
-              </h3>
+          <div className="border-b border-[#f3e8e0] px-6 py-5">
+            <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+              Ближайшие сроки годности
+            </h3>
 
-              <p className="mt-1 text-[13px] text-[#a09187]">
-                Продукты, которым нужно уделить внимание в первую очередь
-              </p>
-            </div>
+            <p className="mt-1 text-[13px] text-[#a09187]">
+              Продукты, которым нужно уделить внимание в первую очередь
+            </p>
           </div>
 
           <div className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] gap-3 bg-[#fffaf7] px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
