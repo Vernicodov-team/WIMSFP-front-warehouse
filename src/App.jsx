@@ -4,10 +4,10 @@ import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
 
 function App() {
-  const [activePage, setActivePage] = useState("Дашборд");
+  const [activePage, setActivePage] = useState("Главная");
 
   function renderPage() {
-  if (activePage === "Дашборд") {
+  if (activePage === "Главная") {
     return <Dashboard onNavigate={setActivePage} />;
   }
 

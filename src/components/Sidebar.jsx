@@ -1,7 +1,7 @@
 const menuItems = [
   {
-    label: "Дашборд",
-    icon: "▦",
+    label: "Главная",
+    icon: "◈",
   },
   {
     label: "История поставок",
@@ -58,7 +58,7 @@ function Sidebar({ activePage, onPageChange }) {
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[15px] ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-center text-[15px] leading-none ${
                   isActive
                     ? "bg-[#ef741d] font-bold text-white"
                     : "text-[#9d8678]"

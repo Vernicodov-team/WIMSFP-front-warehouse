@@ -84,7 +84,7 @@ const expirationProducts = [
   },
 ];
 
-function Dashboard({ onNavigate }) {
+function Dashboard() {
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
