@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
 import Warehouse from "./pages/Warehouse";
+import ContentEditor from "./pages/ContentEditor";
 
 function App() {
   const [activePage, setActivePage] = useState("Главная");
@@ -18,6 +19,10 @@ function App() {
 
     if (activePage === "Склад") {
       return <Warehouse />;
+    }
+
+    if (activePage === "Редактор содержимого") {
+      return <ContentEditor />;
     }
 
     return (

@@ -16,7 +16,7 @@ const menuItems = [
     icon: "▣",
   },
   {
-    label: "Редактор меню",
+    label: "Редактор содержимого",
     icon: "✎",
   },
   {
