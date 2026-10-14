@@ -1,144 +1,18 @@
 import { useMemo, useState } from "react";
 
-const deliveries = [
-  {
-    id: 1,
-    number: "П-1042",
-    date: "2026-10-13",
-    supplier: "ООО «ФудПоставка»",
-    totalWeight: 240,
-    cost: 64500,
-    products: [
-      {
-        name: "Куриное филе",
-        quantity: 25,
-        unit: "кг",
-        productionDate: "2026-10-07",
-        expirationDate: "2026-10-14",
-        price: 420,
-      },
-      {
-        name: "Томаты",
-        quantity: 40,
-        unit: "кг",
-        productionDate: "2026-10-10",
-        expirationDate: "2026-10-17",
-        price: 180,
-      },
-    ],
-  },
-  {
-    id: 2,
-    number: "П-1041",
-    date: "2026-10-11",
-    supplier: "ООО «Свежий продукт»",
-    totalWeight: 180,
-    cost: 48200,
-    products: [
-      {
-        name: "Сливки 20%",
-        quantity: 30,
-        unit: "л",
-        productionDate: "2026-10-09",
-        expirationDate: "2026-10-16",
-        price: 260,
-      },
-      {
-        name: "Моцарелла",
-        quantity: 18,
-        unit: "кг",
-        productionDate: "2026-10-08",
-        expirationDate: "2026-10-18",
-        price: 540,
-      },
-    ],
-  },
-  {
-    id: 3,
-    number: "П-1040",
-    date: "2026-10-08",
-    supplier: "ИП «Овощной мир»",
-    totalWeight: 320,
-    cost: 37600,
-    products: [
-      {
-        name: "Картофель",
-        quantity: 120,
-        unit: "кг",
-        productionDate: "2026-10-01",
-        expirationDate: "2026-12-01",
-        price: 70,
-      },
-      {
-        name: "Морковь",
-        quantity: 80,
-        unit: "кг",
-        productionDate: "2026-10-01",
-        expirationDate: "2026-12-01",
-        price: 65,
-      },
-    ],
-  },
-  {
-    id: 4,
-    number: "П-1039",
-    date: "2026-10-03",
-    supplier: "ООО «ФудПоставка»",
-    totalWeight: 95,
-    cost: 21900,
-    products: [
-      {
-        name: "Базилик",
-        quantity: 5,
-        unit: "кг",
-        productionDate: "2026-10-02",
-        expirationDate: "2026-10-08",
-        price: 900,
-      },
-      {
-        name: "Зелёный лук",
-        quantity: 10,
-        unit: "кг",
-        productionDate: "2026-10-02",
-        expirationDate: "2026-10-08",
-        price: 420,
-      },
-    ],
-  },
-  {
-    id: 5,
-    number: "П-1038",
-    date: "2026-09-27",
-    supplier: "ООО «Свежий продукт»",
-    totalWeight: 210,
-    cost: 55800,
-    products: [
-      {
-        name: "Пшеничная мука",
-        quantity: 100,
-        unit: "кг",
-        productionDate: "2026-09-20",
-        expirationDate: "2027-02-20",
-        price: 95,
-      },
-      {
-        name: "Оливковое масло",
-        quantity: 30,
-        unit: "л",
-        productionDate: "2026-09-01",
-        expirationDate: "2027-01-12",
-        price: 780,
-      },
-    ],
-  },
-];
-
 function formatDate(date) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("ru-RU");
+  if (!date) {
+    return "—";
+  }
+
+  const normalizedDate =
+    date.length === 10 ? `${date}T00:00:00` : date;
+
+  return new Date(normalizedDate).toLocaleDateString("ru-RU");
 }
 
 function formatMoney(value) {
-  return `${value.toLocaleString("ru-RU")} ₽`;
+  return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 }
 
 function isDateInPeriod(date, period) {
@@ -146,11 +20,15 @@ function isDateInPeriod(date, period) {
     return true;
   }
 
+  if (!date) {
+    return false;
+  }
+
   const deliveryDate = new Date(`${date}T00:00:00`);
-  const today = new Date("2026-10-13T00:00:00");
+  const today = new Date("2026-10-14T00:00:00");
 
   if (period === "today") {
-    return date === "2026-10-13";
+    return date === "2026-10-14";
   }
 
   if (period === "week") {
@@ -170,7 +48,7 @@ function isDateInPeriod(date, period) {
   return true;
 }
 
-function DeliveriesHistory() {
+function DeliveriesHistory({ deliveries = [] }) {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
   const [expandedDelivery, setExpandedDelivery] = useState(null);
@@ -179,19 +57,29 @@ function DeliveriesHistory() {
     const normalizedSearch = search.trim().toLowerCase();
 
     return deliveries.filter((delivery) => {
+      const products = Array.isArray(delivery.products)
+        ? delivery.products
+        : [];
+
       const matchesSearch =
         !normalizedSearch ||
-        delivery.number.toLowerCase().includes(normalizedSearch) ||
-        delivery.supplier.toLowerCase().includes(normalizedSearch) ||
-        delivery.products.some((product) =>
-          product.name.toLowerCase().includes(normalizedSearch),
+        String(delivery.number || "")
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        String(delivery.supplier || "")
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        products.some((product) =>
+          String(product.name || "")
+            .toLowerCase()
+            .includes(normalizedSearch),
         );
 
       const matchesPeriod = isDateInPeriod(delivery.date, period);
 
       return matchesSearch && matchesPeriod;
     });
-  }, [search, period]);
+  }, [deliveries, search, period]);
 
   function resetFilters() {
     setSearch("");
@@ -204,6 +92,15 @@ function DeliveriesHistory() {
     );
   }
 
+  const totalCost = deliveries.reduce(
+    (total, delivery) => total + Number(delivery.cost || 0),
+    0,
+  );
+
+  const deliveriesThisMonth = deliveries.filter((delivery) =>
+    isDateInPeriod(delivery.date, "month"),
+  ).length;
+
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
@@ -211,12 +108,16 @@ function DeliveriesHistory() {
           <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
             История поставок
           </h2>
+
+          <p className="mt-2 text-[14px] text-[#958278]">
+            Все поступления продуктов на склад
+          </p>
         </header>
 
         <section className="mb-8 grid grid-cols-3 gap-4">
           <StatCard
             title="Всего поставок"
-            value="48"
+            value={deliveries.length}
             description="за всё время"
             icon="▣"
             color="bg-[#fff0df] text-[#d9671b]"
@@ -224,16 +125,16 @@ function DeliveriesHistory() {
 
           <StatCard
             title="Поставок за месяц"
-            value="12"
-            description="за октябрь"
+            value={deliveriesThisMonth}
+            description="за текущий месяц"
             icon="↗"
             color="bg-[#fff4d8] text-[#c8881b]"
           />
 
           <StatCard
-            title="Общий расход поставок"
-            value="84 500 ₽"
-            description="за текущий месяц"
+            title="Общая стоимость"
+            value={formatMoney(totalCost)}
+            description="по всем поставкам"
             icon="₽"
             color="bg-[#ffe5c9] text-[#d9671b]"
           />
@@ -242,6 +143,7 @@ function DeliveriesHistory() {
         <section className="mb-5 rounded-[20px] border border-[#f0e2d8] bg-white p-5">
           <div className="flex items-center gap-3">
             <input
+              type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Поиск по номеру, продукту или поставщику..."
@@ -279,7 +181,7 @@ function DeliveriesHistory() {
             <div>Дата</div>
             <div>Поставщик</div>
             <div>Позиций</div>
-            <div>Вес</div>
+            <div>Количество</div>
             <div>Стоимость</div>
             <div />
           </div>
@@ -291,12 +193,15 @@ function DeliveriesHistory() {
           ) : (
             filteredDeliveries.map((delivery) => {
               const isExpanded = expandedDelivery === delivery.id;
+              const products = Array.isArray(delivery.products)
+                ? delivery.products
+                : [];
 
               return (
                 <div key={delivery.id}>
                   <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_60px] items-center gap-3 border-t border-[#f3e9e2] px-6 py-4 text-[12px]">
                     <div className="font-extrabold text-[#493e38]">
-                      {delivery.number}
+                      {delivery.number || "Без номера"}
                     </div>
 
                     <div className="text-[#85766d]">
@@ -304,15 +209,15 @@ function DeliveriesHistory() {
                     </div>
 
                     <div className="text-[#665850]">
-                      {delivery.supplier}
+                      {delivery.supplier || "—"}
                     </div>
 
                     <div className="text-[#85766d]">
-                      {delivery.products.length}
+                      {products.length}
                     </div>
 
                     <div className="text-[#85766d]">
-                      {delivery.totalWeight} кг
+                      {delivery.totalWeight || 0}
                     </div>
 
                     <div className="font-bold text-[#665850]">
@@ -338,37 +243,44 @@ function DeliveriesHistory() {
                   {isExpanded && (
                     <div className="border-t border-[#f3e9e2] bg-[#fffaf6] px-6 py-4">
                       <div className="mb-3 text-[12px] font-extrabold text-[#594a42]">
-                        Состав поставки {delivery.number}
+                        Состав поставки {delivery.number || ""}
                       </div>
 
-                      <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.8fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+                      <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
                         <div>Продукт</div>
                         <div>Количество</div>
+                        <div>Единица</div>
                         <div>Произведён</div>
                         <div>Годен до</div>
                         <div>Цена</div>
+                        <div>Стоимость</div>
                       </div>
 
-                      {delivery.products.map((product) => (
+                      {products.map((product, index) => (
                         <div
-                          key={`${delivery.id}-${product.name}`}
-                          className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.8fr] gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
+                          key={`${product.name}-${index}`}
+                          className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
                         >
                           <div className="font-bold text-[#493e38]">
                             {product.name}
                           </div>
 
+                          <div>{product.quantity || 0}</div>
+                          <div>{product.unit || "—"}</div>
                           <div>
-                            {product.quantity} {product.unit}
+                            {formatDate(product.productionDate)}
                           </div>
-
-                          <div>{formatDate(product.productionDate)}</div>
-
-                          <div>{formatDate(product.expirationDate)}</div>
-
+                          <div>
+                            {formatDate(product.expirationDate)}
+                          </div>
                           <div>{formatMoney(product.price)}</div>
+                          <div>{formatMoney(product.cost)}</div>
                         </div>
                       ))}
+
+                      <div className="mt-3 flex justify-end border-t border-[#eaded5] pt-3 text-[14px] font-extrabold text-[#493e38]">
+                        Итого: {formatMoney(delivery.cost)}
+                      </div>
                     </div>
                   )}
                 </div>

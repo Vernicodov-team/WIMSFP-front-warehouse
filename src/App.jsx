@@ -10,6 +10,16 @@ import SupplyInput from "./pages/SupplyInput";
 
 function App() {
   const [activePage, setActivePage] = useState("Главная");
+  const [deliveries, setDeliveries] = useState(initialDeliveries);
+
+  function addDelivery(newDelivery) {
+    setDeliveries((currentDeliveries) => [
+      newDelivery,
+      ...currentDeliveries,
+    ]);
+
+    setActivePage("История поставок");
+  }
 
   function renderPage() {
     if (activePage === "Главная") {
@@ -17,7 +27,7 @@ function App() {
     }
 
     if (activePage === "История поставок") {
-      return <DeliveriesHistory deliveries={initialDeliveries} />;
+      return <DeliveriesHistory deliveries={deliveries} />;
     }
 
     if (activePage === "Склад") {
@@ -33,7 +43,7 @@ function App() {
     }
 
     if (activePage === "Ввод поставок") {
-      return <SupplyInput />;
+      return <SupplyInput onAddDelivery={addDelivery} />;
     }
 
     if (activePage === "Панель управления пользователями") {

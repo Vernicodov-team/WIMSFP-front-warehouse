@@ -67,22 +67,25 @@ function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 }
 
-function SupplyInput() {
-  const [deliveryNumber, setDeliveryNumber] = useState("П-1043");
-  const [deliveryDate, setDeliveryDate] = useState("2026-10-14");
+function SupplyInput({ onAddDelivery }) {
+  const [deliveryNumber, setDeliveryNumber] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
   const [supplier, setSupplier] = useState("");
-  const [message, setMessage] = useState("");
 
   const [deliveryProducts, setDeliveryProducts] = useState([
-    {
-      id: 1,
-      productId: "",
-      amount: "",
-      price: "",
-    },
-  ]);
+  {
+    id: 1,
+    productId: "",
+    amount: "",
+    price: "",
+  },
+]);
+
+  const [error, setError] = useState("");
 
   function addProductRow() {
+    setError("");
+
     setDeliveryProducts((currentProducts) => [
       ...currentProducts,
       {
@@ -95,6 +98,8 @@ function SupplyInput() {
   }
 
   function removeProductRow(rowId) {
+    setError("");
+
     if (deliveryProducts.length === 1) {
       return;
     }
@@ -105,6 +110,8 @@ function SupplyInput() {
   }
 
   function updateProductRow(rowId, field, value) {
+    setError("");
+
     setDeliveryProducts((currentProducts) =>
       currentProducts.map((product) =>
         product.id === rowId
@@ -122,10 +129,10 @@ function SupplyInput() {
   }
 
   function resetForm() {
-    setDeliveryNumber("П-1043");
-    setDeliveryDate("2026-10-14");
+    setDeliveryNumber("");
+    setDeliveryDate("");
     setSupplier("");
-    setMessage("");
+    setError("");
 
     setDeliveryProducts([
       {
@@ -139,35 +146,56 @@ function SupplyInput() {
 
   function submitSupply(event) {
     event.preventDefault();
-    setMessage("");
+    setError("");
 
     if (!deliveryNumber.trim()) {
-      setMessage("Введите номер поставки.");
+      setError("Введите номер поставки.");
       return;
     }
 
     if (!deliveryDate) {
-      setMessage("Выберите дату поставки.");
+      setError("Выберите дату поставки.");
       return;
     }
 
     if (!supplier) {
-      setMessage("Выберите поставщика.");
+      setError("Выберите поставщика.");
       return;
     }
 
-    const invalidProduct = deliveryProducts.some(
-      (deliveryProduct) =>
-        !deliveryProduct.productId ||
-        Number(deliveryProduct.amount) <= 0 ||
-        Number(deliveryProduct.price) < 0 ||
-        deliveryProduct.price === "",
+    const emptyProductRow = deliveryProducts.some(
+      (deliveryProduct) => !deliveryProduct.productId,
     );
 
-    if (invalidProduct) {
-      setMessage(
-        "Заполните продукт, количество и цену во всех строках.",
-      );
+    if (emptyProductRow) {
+      setError("Выберите продукт в каждой строке.");
+      return;
+    }
+
+    const invalidAmount = deliveryProducts.some(
+      (deliveryProduct) => Number(deliveryProduct.amount) <= 0,
+    );
+
+    if (invalidAmount) {
+      setError("Количество должно быть больше нуля.");
+      return;
+    }
+
+    const emptyPrice = deliveryProducts.some(
+      (deliveryProduct) => deliveryProduct.price === "",
+    );
+
+    if (emptyPrice) {
+      setError("Введите цену для каждого продукта.");
+      return;
+    }
+
+    const invalidPrice = deliveryProducts.some(
+      (deliveryProduct) => Number(deliveryProduct.price) < 0,
+    );
+
+    if (invalidPrice) {
+      setError("Цена не может быть отрицательной.");
       return;
     }
 
@@ -180,11 +208,16 @@ function SupplyInput() {
       const price = Number(deliveryProduct.price);
 
       return {
-        productType: selectedProduct.name,
-        amount,
-        unit: selectedProduct.unit,
+        name: selectedProduct.name,
+        quantity: amount,
+        unit: unitLabels[selectedProduct.unit],
+        backendUnit: selectedProduct.unit,
         price,
         cost: amount * price,
+
+        // Эти даты позже будут приходить от бэкенда.
+        productionDate: null,
+        expirationDate: null,
       };
     });
 
@@ -193,17 +226,22 @@ function SupplyInput() {
       0,
     );
 
-    console.log("Данные поставки для будущего API:", {
+    const totalWeight = preparedProducts.reduce(
+      (total, product) => total + product.quantity,
+      0,
+    );
+
+    const newDelivery = {
+      id: Date.now(),
       number: deliveryNumber.trim(),
       date: deliveryDate,
       supplier,
+      totalWeight,
+      cost: totalCost,
       products: preparedProducts,
-      totalCost,
-    });
+    };
 
-    setMessage(
-      `Поставка ${deliveryNumber} проверена. Общая стоимость: ${formatMoney(totalCost)}.`,
-    );
+    onAddDelivery(newDelivery);
   }
 
   return (
@@ -421,9 +459,9 @@ function SupplyInput() {
             </div>
           </section>
 
-          {message && (
-            <div className="mb-6 rounded-xl bg-[#e8f3e1] px-4 py-3 text-[13px] font-bold text-[#59874c]">
-              {message}
+          {error && (
+            <div className="mb-6 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+              {error}
             </div>
           )}
 
@@ -440,7 +478,7 @@ function SupplyInput() {
               type="submit"
               className="rounded-xl bg-[#e96d1b] px-5 py-3 text-[13px] font-bold text-white shadow-[0_5px_12px_rgba(232,109,27,0.18)] transition hover:bg-[#d95e12]"
             >
-              Проверить поставку
+              Добавить поставку
             </button>
           </div>
         </form>
