@@ -66,82 +66,57 @@ const attentionItems = [
   },
 ];
 
+const statusConfig = {
+  Expiring: {
+    label: "Скоро истекает",
+    className: "bg-[#fff0c9] text-[#b8791b]",
+  },
+  Expired: {
+    label: "Просрочено",
+    className: "bg-[#ffe1dd] text-[#c84d45]",
+  },
+};
+
 const expirationProducts = [
   {
     product: "Куриное филе",
     batch: "П-1038",
     expiration: "14.10.2026",
     remaining: "1 день",
-    status: "Скоро истекает",
-    statusClass: "bg-[#fff0c9] text-[#b8791b]",
+    status: "Expiring",
   },
   {
     product: "Томаты",
     batch: "П-1039",
     expiration: "15.10.2026",
     remaining: "2 дня",
-    status: "Скоро истекает",
-    statusClass: "bg-[#fff0c9] text-[#b8791b]",
+    status: "Expiring",
   },
   {
     product: "Сливки 20%",
     batch: "П-1037",
     expiration: "16.10.2026",
     remaining: "3 дня",
-    status: "Скоро истекает",
-    statusClass: "bg-[#fff0c9] text-[#b8791b]",
+    status: "Expiring",
   },
   {
     product: "Моцарелла",
     batch: "П-1031",
     expiration: "12.10.2026",
     remaining: "Просрочено",
-    status: "Просрочено",
-    statusClass: "bg-[#ffe1dd] text-[#c84d45]",
+    status: "Expired",
   },
 ];
 
 const financeData = [
-  {
-    day: "1 окт.",
-    revenue: 72,
-    expenses: 45,
-  },
-  {
-    day: "5 окт.",
-    revenue: 88,
-    expenses: 52,
-  },
-  {
-    day: "9 окт.",
-    revenue: 64,
-    expenses: 38,
-  },
-  {
-    day: "13 окт.",
-    revenue: 96,
-    expenses: 57,
-  },
-  {
-    day: "17 окт.",
-    revenue: 78,
-    expenses: 48,
-  },
-  {
-    day: "21 окт.",
-    revenue: 91,
-    expenses: 54,
-  },
-  {
-    day: "25 окт.",
-    revenue: 83,
-    expenses: 49,
-  },
-  {
-    day: "31 окт.",
-    revenue: 100,
-    expenses: 62,
-  },
+  { day: "1 окт.", revenue: 72, expenses: 45 },
+  { day: "5 окт.", revenue: 88, expenses: 52 },
+  { day: "9 окт.", revenue: 64, expenses: 38 },
+  { day: "13 окт.", revenue: 96, expenses: 57 },
+  { day: "17 окт.", revenue: 78, expenses: 48 },
+  { day: "21 окт.", revenue: 91, expenses: 54 },
+  { day: "25 окт.", revenue: 83, expenses: 49 },
+  { day: "31 окт.", revenue: 100, expenses: 62 },
 ];
 
 function Dashboard() {
@@ -350,32 +325,39 @@ function Dashboard() {
             <div>Статус</div>
           </div>
 
-          {expirationProducts.map((product) => (
-            <div
-              key={product.product}
-              className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
-            >
-              <div className="font-bold text-[#493e38]">
-                {product.product}
+          {expirationProducts.map((product) => {
+            const status = statusConfig[product.status] || {
+              label: "Неизвестный статус",
+              className: "bg-[#eee9e5] text-[#81766e]",
+            };
+
+            return (
+              <div
+                key={product.product}
+                className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
+              >
+                <div className="font-bold text-[#493e38]">
+                  {product.product}
+                </div>
+
+                <div className="text-[#85766d]">{product.batch}</div>
+
+                <div className="text-[#85766d]">{product.expiration}</div>
+
+                <div className="font-bold text-[#665850]">
+                  {product.remaining}
+                </div>
+
+                <div>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}
+                  >
+                    {status.label}
+                  </span>
+                </div>
               </div>
-
-              <div className="text-[#85766d]">{product.batch}</div>
-
-              <div className="text-[#85766d]">{product.expiration}</div>
-
-              <div className="font-bold text-[#665850]">
-                {product.remaining}
-              </div>
-
-              <div>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${product.statusClass}`}
-                >
-                  {product.status}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       </div>
     </main>
