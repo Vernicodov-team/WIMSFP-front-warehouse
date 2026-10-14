@@ -1,0 +1,58 @@
+export const initialDeliveries = [
+  {
+    id: 1,
+    number: "П-1042",
+    date: "2026-10-13",
+    supplier: "ООО «ФудПоставка»",
+    totalWeight: 65,
+    cost: 17700,
+    products: [
+      {
+        name: "Куриное филе",
+        quantity: 25,
+        unit: "кг",
+        productionDate: "2026-10-07",
+        expirationDate: "2026-10-14",
+        price: 420,
+        cost: 10500,
+      },
+      {
+        name: "Томаты",
+        quantity: 40,
+        unit: "кг",
+        productionDate: "2026-10-10",
+        expirationDate: "2026-10-17",
+        price: 180,
+        cost: 7200,
+      },
+    ],
+  },
+  {
+    id: 2,
+    number: "П-1041",
+    date: "2026-10-11",
+    supplier: "ООО «Свежий продукт»",
+    totalWeight: 48,
+    cost: 17520,
+    products: [
+      {
+        name: "Сливки 20%",
+        quantity: 30,
+        unit: "л",
+        productionDate: "2026-10-09",
+        expirationDate: "2026-10-16",
+        price: 260,
+        cost: 7800,
+      },
+      {
+        name: "Моцарелла",
+        quantity: 18,
+        unit: "кг",
+        productionDate: "2026-10-08",
+        expirationDate: "2026-10-18",
+        price: 540,
+        cost: 9720,
+      },
+    ],
+  },
+];
