@@ -45,9 +45,9 @@ const initialDishes = [
     active: true,
     imageUrl: "",
     ingredients: [
-      { name: "Мясо", amount: "250 г" },
-      { name: "Томаты", amount: "100 г" },
-      { name: "Картофель", amount: "150 г" },
+      { name: "Мясо", amount: "250", unit: "г" },
+      { name: "Томаты", amount: "100", unit: "г" },
+      { name: "Картофель", amount: "150", unit: "г" },
     ],
   },
   {
@@ -58,9 +58,9 @@ const initialDishes = [
     active: true,
     imageUrl: "",
     ingredients: [
-      { name: "Мясо", amount: "200 г" },
-      { name: "Молоко", amount: "100 мл" },
-      { name: "Рис", amount: "150 г" },
+      { name: "Мясо", amount: "200", unit: "г" },
+      { name: "Молоко", amount: "100", unit: "мл" },
+      { name: "Рис", amount: "150", unit: "г" },
     ],
   },
   {
@@ -71,8 +71,8 @@ const initialDishes = [
     active: false,
     imageUrl: "",
     ingredients: [
-      { name: "Томаты", amount: "150 г" },
-      { name: "Оливковое масло", amount: "20 мл" },
+      { name: "Томаты", amount: "150", unit: "г" },
+      { name: "Оливковое масло", amount: "20", unit: "мл" },
     ],
   },
 ];
@@ -132,6 +132,16 @@ function ContentEditor() {
     );
   }
 
+  function saveDish(updatedDish) {
+    setDishes((currentDishes) =>
+      currentDishes.map((dish) =>
+        dish.id === updatedDish.id ? updatedDish : dish,
+      ),
+    );
+
+    setSelectedDish(null);
+  }
+
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
@@ -188,7 +198,9 @@ function ContentEditor() {
       {selectedDish && (
         <DishModal
           dish={selectedDish}
+          products={products}
           onClose={() => setSelectedDish(null)}
+          onSave={saveDish}
         />
       )}
     </main>
@@ -373,15 +385,17 @@ function DishImage({ src, alt }) {
       className="h-[180px] w-full object-cover"
       onError={(event) => {
         event.currentTarget.style.display = "none";
-        event.currentTarget.nextElementSibling.style.display = "flex";
       }}
     />
   );
 }
 
-function DishModal({ dish, onClose }) {
+function DishModal({ dish, products, onClose, onSave }) {
   const [ingredients, setIngredients] = useState(dish.ingredients);
   const [imageUrl, setImageUrl] = useState(dish.imageUrl || "");
+  const [dishName, setDishName] = useState(dish.name);
+  const [dishPrice, setDishPrice] = useState(dish.price);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
 
   function removeIngredient(ingredientName) {
     setIngredients((currentIngredients) =>
@@ -391,9 +405,19 @@ function DishModal({ dish, onClose }) {
     );
   }
 
+  function saveChanges() {
+    onSave({
+      ...dish,
+      name: dishName,
+      price: dishPrice,
+      imageUrl,
+      ingredients,
+    });
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#332d29]/35 p-8 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-[900px] overflow-y-auto rounded-[24px] bg-[#fffaf6] shadow-[0_20px_60px_rgba(62,37,20,0.2)]">
+      <div className="relative max-h-[90vh] w-full max-w-[900px] overflow-y-auto rounded-[24px] bg-[#fffaf6] shadow-[0_20px_60px_rgba(62,37,20,0.2)]">
         <div className="flex items-center justify-between border-b border-[#f0e2d8] px-7 py-5">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#b18e7c]">
@@ -417,7 +441,7 @@ function DishModal({ dish, onClose }) {
 
         <div className="grid grid-cols-2 gap-7 p-7">
           <div>
-            <DishImage src={imageUrl} alt={dish.name} />
+            <DishImage src={imageUrl} alt={dishName} />
 
             <label className="mt-4 block">
               <span className="mb-2 block text-[11px] font-bold text-[#85766d]">
@@ -440,7 +464,8 @@ function DishModal({ dish, onClose }) {
                 </span>
 
                 <input
-                  defaultValue={dish.name}
+                  value={dishName}
+                  onChange={(event) => setDishName(event.target.value)}
                   className="h-10 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
                 />
               </label>
@@ -451,7 +476,8 @@ function DishModal({ dish, onClose }) {
                 </span>
 
                 <input
-                  defaultValue={dish.price}
+                  value={dishPrice}
+                  onChange={(event) => setDishPrice(event.target.value)}
                   className="h-10 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
                 />
               </label>
@@ -459,9 +485,19 @@ function DishModal({ dish, onClose }) {
           </div>
 
           <div>
-            <h4 className="mb-4 text-[20px] font-extrabold text-[#403731]">
-              Состав
-            </h4>
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-[20px] font-extrabold text-[#403731]">
+                Состав
+              </h4>
+
+              <button
+                type="button"
+                onClick={() => setIsAddProductOpen(true)}
+                className="rounded-xl bg-[#fff0df] px-3 py-2 text-[11px] font-bold text-[#d9671b] transition hover:bg-[#ffe2cb]"
+              >
+                + Добавить продукт
+              </button>
+            </div>
 
             <div className="space-y-3">
               {ingredients.length === 0 ? (
@@ -471,7 +507,7 @@ function DishModal({ dish, onClose }) {
               ) : (
                 ingredients.map((ingredient) => (
                   <div
-                    key={ingredient.name}
+                    key={ingredient.id || ingredient.name}
                     className="flex items-center justify-between rounded-xl border border-[#f0e2d8] bg-white px-4 py-3"
                   >
                     <div>
@@ -480,7 +516,7 @@ function DishModal({ dish, onClose }) {
                       </div>
 
                       <div className="mt-1 text-[11px] text-[#958278]">
-                        {ingredient.amount}
+                        {ingredient.amount} {ingredient.unit || ""}
                       </div>
                     </div>
 
@@ -488,6 +524,7 @@ function DishModal({ dish, onClose }) {
                       type="button"
                       onClick={() => removeIngredient(ingredient.name)}
                       aria-label={`Убрать ${ingredient.name} из состава`}
+                      title="Убрать продукт"
                       className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0df] text-[#d9671b] transition hover:bg-[#ffe0c2] hover:text-[#c84d45]"
                     >
                       <MinusIcon />
@@ -496,13 +533,6 @@ function DishModal({ dish, onClose }) {
                 ))
               )}
             </div>
-
-            <button
-              type="button"
-              className="mt-4 w-full rounded-xl border border-dashed border-[#e9b58e] py-2.5 text-[12px] font-bold text-[#d9671b] transition hover:bg-[#fff0df]"
-            >
-              + Добавить ингредиент
-            </button>
           </div>
         </div>
 
@@ -517,13 +547,189 @@ function DishModal({ dish, onClose }) {
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={saveChanges}
             className="rounded-xl bg-[#e96d1b] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#d95e12]"
           >
             Сохранить
           </button>
         </div>
+
+        {isAddProductOpen && (
+          <AddProductModal
+            products={products}
+            ingredients={ingredients}
+            onClose={() => setIsAddProductOpen(false)}
+            onAdd={(ingredient) => {
+              setIngredients((currentIngredients) => [
+                ...currentIngredients,
+                ingredient,
+              ]);
+              setIsAddProductOpen(false);
+            }}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+function AddProductModal({
+  products,
+  ingredients,
+  onClose,
+  onAdd,
+}) {
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [amount, setAmount] = useState("");
+
+  const selectedProduct = products.find(
+    (product) => product.id === Number(selectedProductId),
+  );
+
+  const inputUnit =
+    selectedProduct?.unit === "Kilogram"
+      ? "г"
+      : selectedProduct?.unit === "Liter"
+        ? "мл"
+        : "шт.";
+
+  function convertAmount() {
+    const numericAmount = Number(amount);
+
+    if (!numericAmount || numericAmount <= 0) {
+      return null;
+    }
+
+    if (
+      selectedProduct.unit === "Kilogram" ||
+      selectedProduct.unit === "Liter"
+    ) {
+      return numericAmount / 1000;
+    }
+
+    return numericAmount;
+  }
+
+  function submitProduct(event) {
+    event.preventDefault();
+
+    if (!selectedProduct) {
+      alert("Выберите продукт.");
+      return;
+    }
+
+    const convertedAmount = convertAmount();
+
+    if (convertedAmount === null) {
+      alert("Введите корректное количество.");
+      return;
+    }
+
+    const alreadyAdded = ingredients.some(
+      (ingredient) => ingredient.name === selectedProduct.name,
+    );
+
+    if (alreadyAdded) {
+      alert("Этот продукт уже добавлен в состав.");
+      return;
+    }
+
+    onAdd({
+      id: `${selectedProduct.id}-${Date.now()}`,
+      name: selectedProduct.name,
+      amount: convertedAmount,
+      unit: unitTranslations[selectedProduct.unit],
+      backendAmount: convertedAmount,
+      backendUnit: selectedProduct.unit,
+    });
+  }
+
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[24px] bg-[#332d29]/30 p-6 backdrop-blur-sm">
+      <form
+        onSubmit={submitProduct}
+        className="w-full max-w-[430px] rounded-[22px] bg-white p-6 shadow-[0_15px_45px_rgba(62,37,20,0.2)]"
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-[20px] font-extrabold text-[#332d29]">
+            Добавить продукт
+          </h3>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть окно"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#a39389] transition hover:bg-[#fff0df] hover:text-[#d9671b]"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <label className="block">
+          <span className="mb-2 block text-[12px] font-bold text-[#85766d]">
+            Продукт
+          </span>
+
+          <select
+            value={selectedProductId}
+            onChange={(event) => setSelectedProductId(event.target.value)}
+            className="h-11 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] text-[#665850] focus:border-[#eb701c] focus:outline-none"
+          >
+            <option value="">Выберите продукт</option>
+
+            {products.map((product) => (
+              <option
+                key={product.id}
+                value={product.id}
+                disabled={ingredients.some(
+                  (ingredient) => ingredient.name === product.name,
+                )}
+              >
+                {product.name} —{" "}
+                {unitTranslations[product.unit] || product.unit}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-4 block">
+          <span className="mb-2 block text-[12px] font-bold text-[#85766d]">
+            Количество {selectedProduct ? `(${inputUnit})` : ""}
+          </span>
+
+          <input
+            type="number"
+            min="0"
+            step={selectedProduct?.unit === "Item" ? "1" : "0.01"}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder={
+              selectedProduct
+                ? `Введите количество в ${inputUnit}`
+                : "Сначала выберите продукт"
+            }
+            disabled={!selectedProduct}
+            className="h-11 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] placeholder:text-[#b5a69d] focus:border-[#eb701c] focus:outline-none disabled:bg-[#f8f3ef]"
+          />
+        </label>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-[#eaded5] px-4 py-2.5 text-[12px] font-bold text-[#85766d] transition hover:bg-[#fff8f1]"
+          >
+            Отмена
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-xl bg-[#e96d1b] px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-[#d95e12]"
+          >
+            Добавить
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
