@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
 import Warehouse from "./pages/Warehouse";
 import ContentEditor from "./pages/ContentEditor";
+import OrdersHistory from "./pages/OrdersHistory";
 
 function App() {
   const [activePage, setActivePage] = useState("Главная");
@@ -23,6 +24,10 @@ function App() {
 
     if (activePage === "Редактор содержимого") {
       return <ContentEditor />;
+    }
+
+    if (activePage === "История заказов") {
+      return <OrdersHistory />;
     }
 
     return (
