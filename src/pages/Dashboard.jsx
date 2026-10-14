@@ -151,7 +151,7 @@ function Dashboard() {
         <header className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
-              Склад сегодня
+              Ключевые показатели
             </h2>
 
             <p className="mt-2 text-[14px] text-[#958278]">

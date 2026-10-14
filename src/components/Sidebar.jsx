@@ -34,7 +34,7 @@ function Sidebar({ activePage, onPageChange }) {
     <aside className="fixed left-2 top-2 z-10 flex h-[calc(100vh-16px)] w-[250px] flex-col rounded-[16px] bg-[#fff1e4] px-3 py-5">
       <div className="px-3">
         <h1 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#332d29]">
-          Склад
+          Админ-панель
         </h1>
       </div>
 

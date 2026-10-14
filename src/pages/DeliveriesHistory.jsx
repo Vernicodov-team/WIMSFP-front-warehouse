@@ -8,8 +8,6 @@ const deliveries = [
     supplier: "ООО «ФудПоставка»",
     totalWeight: 240,
     cost: 64500,
-    status: "Принята",
-    statusKey: "accepted",
     products: [
       {
         name: "Куриное филе",
@@ -18,7 +16,6 @@ const deliveries = [
         productionDate: "2026-10-07",
         expirationDate: "2026-10-14",
         price: 420,
-        batch: "П-1042-01",
       },
       {
         name: "Томаты",
@@ -27,7 +24,6 @@ const deliveries = [
         productionDate: "2026-10-10",
         expirationDate: "2026-10-17",
         price: 180,
-        batch: "П-1042-02",
       },
     ],
   },
@@ -38,8 +34,6 @@ const deliveries = [
     supplier: "ООО «Свежий продукт»",
     totalWeight: 180,
     cost: 48200,
-    status: "В обработке",
-    statusKey: "processing",
     products: [
       {
         name: "Сливки 20%",
@@ -48,7 +42,6 @@ const deliveries = [
         productionDate: "2026-10-09",
         expirationDate: "2026-10-16",
         price: 260,
-        batch: "П-1041-01",
       },
       {
         name: "Моцарелла",
@@ -57,7 +50,6 @@ const deliveries = [
         productionDate: "2026-10-08",
         expirationDate: "2026-10-18",
         price: 540,
-        batch: "П-1041-02",
       },
     ],
   },
@@ -68,8 +60,6 @@ const deliveries = [
     supplier: "ИП «Овощной мир»",
     totalWeight: 320,
     cost: 37600,
-    status: "Принята",
-    statusKey: "accepted",
     products: [
       {
         name: "Картофель",
@@ -78,7 +68,6 @@ const deliveries = [
         productionDate: "2026-10-01",
         expirationDate: "2026-12-01",
         price: 70,
-        batch: "П-1040-01",
       },
       {
         name: "Морковь",
@@ -87,7 +76,6 @@ const deliveries = [
         productionDate: "2026-10-01",
         expirationDate: "2026-12-01",
         price: 65,
-        batch: "П-1040-02",
       },
     ],
   },
@@ -98,8 +86,6 @@ const deliveries = [
     supplier: "ООО «ФудПоставка»",
     totalWeight: 95,
     cost: 21900,
-    status: "Отменена",
-    statusKey: "cancelled",
     products: [
       {
         name: "Базилик",
@@ -108,7 +94,6 @@ const deliveries = [
         productionDate: "2026-10-02",
         expirationDate: "2026-10-08",
         price: 900,
-        batch: "П-1039-01",
       },
       {
         name: "Зелёный лук",
@@ -117,7 +102,6 @@ const deliveries = [
         productionDate: "2026-10-02",
         expirationDate: "2026-10-08",
         price: 420,
-        batch: "П-1039-02",
       },
     ],
   },
@@ -128,8 +112,6 @@ const deliveries = [
     supplier: "ООО «Свежий продукт»",
     totalWeight: 210,
     cost: 55800,
-    status: "Принята",
-    statusKey: "accepted",
     products: [
       {
         name: "Пшеничная мука",
@@ -138,7 +120,6 @@ const deliveries = [
         productionDate: "2026-09-20",
         expirationDate: "2027-02-20",
         price: 95,
-        batch: "П-1038-01",
       },
       {
         name: "Оливковое масло",
@@ -147,17 +128,10 @@ const deliveries = [
         productionDate: "2026-09-01",
         expirationDate: "2027-01-12",
         price: 780,
-        batch: "П-1038-02",
       },
     ],
   },
 ];
-
-const statusStyles = {
-  accepted: "bg-[#e8f3e1] text-[#59874c]",
-  processing: "bg-[#fff0c9] text-[#b8791b]",
-  cancelled: "bg-[#ffe1dd] text-[#c84d45]",
-};
 
 function formatDate(date) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("ru-RU");
@@ -196,10 +170,9 @@ function isDateInPeriod(date, period) {
   return true;
 }
 
-function DeliveriesHistory({ onNavigate }) {
+function DeliveriesHistory() {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
-  const [status, setStatus] = useState("all");
   const [expandedDelivery, setExpandedDelivery] = useState(null);
 
   const filteredDeliveries = useMemo(() => {
@@ -216,17 +189,13 @@ function DeliveriesHistory({ onNavigate }) {
 
       const matchesPeriod = isDateInPeriod(delivery.date, period);
 
-      const matchesStatus =
-        status === "all" || delivery.statusKey === status;
-
-      return matchesSearch && matchesPeriod && matchesStatus;
+      return matchesSearch && matchesPeriod;
     });
-  }, [search, period, status]);
+  }, [search, period]);
 
   function resetFilters() {
     setSearch("");
     setPeriod("all");
-    setStatus("all");
   }
 
   function toggleDelivery(deliveryId) {
@@ -238,27 +207,13 @@ function DeliveriesHistory({ onNavigate }) {
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
-        <header className="mb-8 flex items-end justify-between">
-          <div>
-            <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
-              История поставок
-            </h2>
-
-            <p className="mt-2 text-[14px] text-[#958278]">
-              Все поступления продуктов на склад
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("Ввод поставок")}
-            className="rounded-full bg-[#e96d1b] px-5 py-3 text-[13px] font-bold text-white shadow-[0_5px_12px_rgba(232,109,27,0.18)] transition hover:bg-[#d95e12]"
-          >
-            + Добавить поставку
-          </button>
+        <header className="mb-8">
+          <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
+            История поставок
+          </h2>
         </header>
 
-        <section className="mb-8 grid grid-cols-4 gap-4">
+        <section className="mb-8 grid grid-cols-3 gap-4">
           <StatCard
             title="Всего поставок"
             value="48"
@@ -276,15 +231,7 @@ function DeliveriesHistory({ onNavigate }) {
           />
 
           <StatCard
-            title="Продуктов получено"
-            value="1 240 кг"
-            description="за текущий месяц"
-            icon="▤"
-            color="bg-[#e9f3e4] text-[#659251]"
-          />
-
-          <StatCard
-            title="Средняя стоимость"
+            title="Общий расход поставок"
             value="84 500 ₽"
             description="за текущий месяц"
             icon="₽"
@@ -312,17 +259,6 @@ function DeliveriesHistory({ onNavigate }) {
               <option value="month">Этот месяц</option>
             </select>
 
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="h-11 rounded-xl border border-[#eaded5] bg-white px-4 text-[13px] text-[#665950] focus:border-[#eb701c] focus:outline-none"
-            >
-              <option value="all">Все статусы</option>
-              <option value="accepted">Принята</option>
-              <option value="processing">В обработке</option>
-              <option value="cancelled">Отменена</option>
-            </select>
-
             <button
               type="button"
               onClick={resetFilters}
@@ -338,14 +274,13 @@ function DeliveriesHistory({ onNavigate }) {
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-          <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_1fr_60px] gap-3 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+          <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_60px] gap-3 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
             <div>Поставка</div>
             <div>Дата</div>
             <div>Поставщик</div>
             <div>Позиций</div>
             <div>Вес</div>
             <div>Стоимость</div>
-            <div>Статус</div>
             <div />
           </div>
 
@@ -359,7 +294,7 @@ function DeliveriesHistory({ onNavigate }) {
 
               return (
                 <div key={delivery.id}>
-                  <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_1fr_60px] items-center gap-3 border-t border-[#f3e9e2] px-6 py-4 text-[12px]">
+                  <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_60px] items-center gap-3 border-t border-[#f3e9e2] px-6 py-4 text-[12px]">
                     <div className="font-extrabold text-[#493e38]">
                       {delivery.number}
                     </div>
@@ -384,14 +319,6 @@ function DeliveriesHistory({ onNavigate }) {
                       {formatMoney(delivery.cost)}
                     </div>
 
-                    <div>
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold ${statusStyles[delivery.statusKey]}`}
-                      >
-                        {delivery.status}
-                      </span>
-                    </div>
-
                     <button
                       type="button"
                       onClick={() => toggleDelivery(delivery.id)}
@@ -414,19 +341,18 @@ function DeliveriesHistory({ onNavigate }) {
                         Состав поставки {delivery.number}
                       </div>
 
-                      <div className="grid grid-cols-[1.3fr_0.7fr_1fr_1fr_0.8fr_1fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+                      <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.8fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
                         <div>Продукт</div>
                         <div>Количество</div>
                         <div>Произведён</div>
                         <div>Годен до</div>
                         <div>Цена</div>
-                        <div>Партия</div>
                       </div>
 
                       {delivery.products.map((product) => (
                         <div
-                          key={product.batch}
-                          className="grid grid-cols-[1.3fr_0.7fr_1fr_1fr_0.8fr_1fr] gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
+                          key={`${delivery.id}-${product.name}`}
+                          className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.8fr] gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
                         >
                           <div className="font-bold text-[#493e38]">
                             {product.name}
@@ -441,8 +367,6 @@ function DeliveriesHistory({ onNavigate }) {
                           <div>{formatDate(product.expirationDate)}</div>
 
                           <div>{formatMoney(product.price)}</div>
-
-                          <div>{product.batch}</div>
                         </div>
                       ))}
                     </div>
@@ -461,7 +385,9 @@ function StatCard({ title, value, description, icon, color }) {
   return (
     <article className="rounded-[20px] border border-[#f0e2d8] bg-white p-5 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
       <div className="mb-5 flex items-start justify-between">
-        <div className="text-[13px] font-bold text-[#776961]">{title}</div>
+        <div className="text-[13px] font-bold text-[#776961]">
+          {title}
+        </div>
 
         <div
           className={`flex h-10 w-10 items-center justify-center rounded-[13px] text-[19px] font-extrabold ${color}`}
@@ -474,7 +400,9 @@ function StatCard({ title, value, description, icon, color }) {
         {value}
       </div>
 
-      <div className="mt-1 text-[12px] text-[#a39389]">{description}</div>
+      <div className="mt-1 text-[12px] text-[#a39389]">
+        {description}
+      </div>
     </article>
   );
 }
