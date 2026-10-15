@@ -10,7 +10,7 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString("ru-RU");
 }
 
-function WriteOffs() {
+function WriteOffs({ refreshKey }) {
   const [writeOffs, setWriteOffs] = useState([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +57,7 @@ function WriteOffs() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadExpiredStocks();
-  }, []);
+  }, [refreshKey]);
 
   const filteredWriteOffs = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();

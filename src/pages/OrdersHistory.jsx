@@ -134,7 +134,7 @@ function normalizeOrder(order, index) {
   };
 }
 
-function OrdersHistory() {
+function OrdersHistory({ refreshKey }) {
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
@@ -203,7 +203,7 @@ function OrdersHistory() {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     let isMounted = true;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
@@ -7,8 +7,9 @@ import ContentEditor from "./pages/ContentEditor";
 import OrdersHistory from "./pages/OrdersHistory";
 import UsersManagement from "./pages/UsersManagement";
 import SupplyInput from "./pages/SupplyInput";
-import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
 import WriteOffs from "./pages/WriteOffs";
+import useDashboardSignalR from "./hooks/useDashboardSignalR";
+import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
 
 const USERS_STORAGE_KEY = "warehouse.users";
 const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
@@ -57,7 +58,7 @@ function readActiveUserId(users) {
       return savedId;
     }
   } catch {
-    // Используем первого пользователя.
+    // Используется первый пользователь.
   }
 
   return users[0]?.id ?? INITIAL_USERS[0].id;
@@ -71,9 +72,8 @@ function App() {
   );
 
   const [activePage, setActivePage] = useState("Главная");
-
-  // Меняется после успешного добавления поставки.
-  const [deliveriesRefreshKey, setDeliveriesRefreshKey] = useState(0);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
+  const [notification, setNotification] = useState("");
 
   const currentUser =
     users.find((user) => user.id === activeUserId) ??
@@ -90,7 +90,7 @@ function App() {
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     } catch {
-      // Работа продолжается до обновления страницы.
+      // Приложение продолжает работать до обновления страницы.
     }
   }, [users]);
 
@@ -101,12 +101,29 @@ function App() {
         currentUser.id,
       );
     } catch {
-      // Переключение работает в текущей сессии.
+      // Переключение работает в рамках текущей сессии.
     }
   }, [currentUser.id]);
 
+  const handleDataChanged = useCallback(() => {
+    setDataRefreshKey((currentKey) => currentKey + 1);
+  }, []);
+
+  const handleNotification = useCallback((message) => {
+    setNotification(message || "Данные обновлены.");
+
+    window.setTimeout(() => {
+      setNotification("");
+    }, 4000);
+  }, []);
+
+  useDashboardSignalR({
+    onDataChanged: handleDataChanged,
+    onNotification: handleNotification,
+  });
+
   function handleDeliveryCreated() {
-    setDeliveriesRefreshKey((currentKey) => currentKey + 1);
+    setDataRefreshKey((currentKey) => currentKey + 1);
     setActivePage("История поставок");
   }
 
@@ -130,23 +147,20 @@ function App() {
   function renderPage() {
     switch (displayedPage) {
       case "Главная":
-        return <Dashboard />;
+        return <Dashboard refreshKey={dataRefreshKey} />;
 
       case "История поставок":
         return (
           <DeliveriesHistory
-            refreshKey={deliveriesRefreshKey}
+            refreshKey={dataRefreshKey}
           />
         );
-      
-      case "Списания":
-        return <WriteOffs />;
 
       case "Склад":
-        return <Warehouse />;
+        return <Warehouse refreshKey={dataRefreshKey} />;
 
       case "История заказов":
-        return <OrdersHistory />;
+        return <OrdersHistory refreshKey={dataRefreshKey} />;
 
       case "Редактор содержимого":
         return <ContentEditor />;
@@ -157,6 +171,9 @@ function App() {
             onAddDelivery={handleDeliveryCreated}
           />
         );
+
+      case "Списания":
+        return <WriteOffs refreshKey={dataRefreshKey} />;
 
       case "Панель управления пользователями":
         if (currentUser.role !== "admin") {
@@ -192,6 +209,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
+      {notification && (
+        <div className="fixed right-6 top-6 z-[100] max-w-[360px] rounded-2xl border border-[#b8dfb0] bg-[#e8f3e1] px-5 py-4 text-[13px] font-bold text-[#59874c] shadow-lg">
+          {notification}
+        </div>
+      )}
+
       <Sidebar
         activePage={displayedPage}
         onPageChange={setActivePage}

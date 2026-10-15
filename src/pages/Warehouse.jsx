@@ -138,7 +138,7 @@ function getStatusConfig(status) {
   );
 }
 
-function Warehouse() {
+function Warehouse({ refreshKey }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [expandedProduct, setExpandedProduct] = useState(null);
@@ -182,7 +182,7 @@ function Warehouse() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts();
-  }, []);
+  }, [refreshKey]);
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
