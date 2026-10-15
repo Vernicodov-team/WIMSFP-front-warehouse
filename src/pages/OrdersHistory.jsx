@@ -141,6 +141,8 @@ function OrdersHistory() {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [financeData, setFinanceData] = useState([]);
+  const [financeLoading, setFinanceLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -195,6 +197,49 @@ function OrdersHistory() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFinance() {
+      try {
+        const response = await fetch(
+          `${API_URL}/dashboard/FinanceAnalitics`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`Ошибка загрузки финансов: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isMounted) {
+          setFinanceData(list);
+        }
+      } catch {
+        if (isMounted) {
+          setFinanceData([]);
+        }
+      } finally {
+        if (isMounted) {
+          setFinanceLoading(false);
+        }
+      }
+    }
+
+    loadFinance();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -225,10 +270,23 @@ function OrdersHistory() {
     );
   }
 
-  const totalRevenue = orders.reduce(
-    (total, order) => total + order.payment,
-    0,
-  );
+  const latestFinance = financeData.reduce((latest, item) => {
+    if (!latest) {
+      return item;
+    }
+
+    const itemOrder = (Number(item.year) || 0) * 12 + (Number(item.month) || 0);
+    const latestOrder =
+      (Number(latest.year) || 0) * 12 + (Number(latest.month) || 0);
+
+    return itemOrder > latestOrder ? item : latest;
+  }, null);
+
+  const monthlyRevenue = financeLoading
+    ? "…"
+    : latestFinance
+      ? formatMoney(latestFinance.income)
+      : "—";
 
   const ordersThisMonth = orders.filter((order) =>
     isDateInPeriod(order.created, "month"),
@@ -272,8 +330,8 @@ function OrdersHistory() {
 
           <StatCard
             title="Общая выручка"
-            value={formatMoney(totalRevenue)}
-            description="по всем заказам"
+            value={monthlyRevenue}
+            description="за последний месяц"
             icon="₽"
             color="bg-[#e8f3e1] text-[#659251]"
           />
