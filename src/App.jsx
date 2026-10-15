@@ -68,7 +68,6 @@ function App() {
       readActiveUserId(readUsers())
   );
   const [activePage, setActivePage] = useState("Главная");
-
   const [authToken, setAuthToken] = useState(() =>
       localStorage.getItem("warehouse.authToken")
   );
@@ -84,11 +83,15 @@ function App() {
   }
 
   const currentUser =
-      users.find((user) => user.id === activeUserId) ?? users[0] ?? INITIAL_USERS[0];
+      users.find((user) => user.id === activeUserId) ??
+      users[0] ??
+      INITIAL_USERS[0];
 
   const visiblePages = PAGE_ACCESS[currentUser.role] ?? ["Главная"];
   const pageIsAllowed = visiblePages.includes(activePage);
-  const displayedPage = pageIsAllowed ? activePage : visiblePages[0] ?? "Главная";
+  const displayedPage = pageIsAllowed
+      ? activePage
+      : visiblePages[0] ?? "Главная";
 
   useEffect(() => {
     try {
@@ -107,20 +110,9 @@ function App() {
   }, [currentUser.id]);
 
   function renderPage() {
-    if (!authToken) {
-      return <Login onSuccess={handleLogin} />;
-    }
-
     if (!visiblePages.includes(displayedPage)) {
       return (
           <div className="m-6 rounded-xl bg-white p-6 text-[#776960]">
-            <button
-                type="button"
-                onClick={handleLogout}
-                className="fixed right-4 top-4 z-50 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#45372f] shadow hover:bg-orange-50"
-            >
-              Выйти
-            </button>
             У вас нет доступа к этому разделу.
           </div>
       );
@@ -162,7 +154,9 @@ function App() {
       case "Ввод поставок":
         return (
             <section className="m-4 rounded-2xl border border-[#eee4dc] bg-white p-6 sm:m-8">
-              <h1 className="text-2xl font-bold text-[#45372f]">Ввод поставок</h1>
+              <h1 className="text-2xl font-bold text-[#45372f]">
+                Ввод поставок
+              </h1>
               <p className="mt-2 text-sm text-[#88796f]">
                 Страница будет добавлена следующим этапом.
               </p>
@@ -198,16 +192,20 @@ function App() {
     }
   }
 
+  if (!authToken) {
+    return <Login onSuccess={handleLogin} />;
+  }
+
   return (
       <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
         <Sidebar
             activePage={displayedPage}
             onPageChange={setActivePage}
             visiblePages={visiblePages}
+            onLogout={handleLogout}
         />
 
-        <div className="min-w-0 flex-1">
-
+        <div className="min-w-0 flex-1 md:ml-64">
           <main>{renderPage()}</main>
         </div>
       </div>
