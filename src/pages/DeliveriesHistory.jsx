@@ -250,7 +250,7 @@ function DeliveriesHistory({ deliveries = [] }) {
                         <div>Продукт</div>
                         <div>Количество</div>
                         <div>Единица</div>
-                        <div>Произведён</div>
+                        <div>Получен</div>
                         <div>Годен до</div>
                         <div>Цена</div>
                         <div>Стоимость</div>

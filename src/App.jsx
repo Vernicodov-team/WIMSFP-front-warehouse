@@ -38,7 +38,7 @@ function App() {
       return <ContentEditor />;
     }
 
-    if (activePage === "История заказов (Всех)") {
+    if (activePage === "История заказов") {
       return <OrdersHistory />;
     }
 
