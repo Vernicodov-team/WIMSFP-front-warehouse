@@ -20,6 +20,52 @@ const INITIAL_USERS = [
   },
 ];
 
+function readRoleFromToken(token) {
+  if (!token) return null;
+
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return null;
+
+    const base64 = payloadPart
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
+
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+
+    const roleClaim =
+        payload.role ??
+        payload.roles ??
+        payload[
+            "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+            ] ??
+        payload[
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role"
+            ];
+
+    return Array.isArray(roleClaim) ? roleClaim[0] : roleClaim;
+  } catch {
+    return null;
+  }
+}
+
+function resolveRoleKey(role) {
+  if (typeof role !== "string") return null;
+
+  const normalizedRole = role.trim().toLowerCase();
+
+  return (
+      Object.keys(PAGE_ACCESS).find(
+          (key) =>
+              key.toLowerCase() === normalizedRole ||
+              String(ROLE_LABELS[key] ?? "").trim().toLowerCase() === normalizedRole
+      ) ?? null
+  );
+}
+
 function readUsers() {
   try {
     const savedUsers = localStorage.getItem(USERS_STORAGE_KEY);
@@ -87,7 +133,9 @@ function App() {
       users[0] ??
       INITIAL_USERS[0];
 
-  const visiblePages = PAGE_ACCESS[currentUser.role] ?? ["Главная"];
+  const backendRole = readRoleFromToken(authToken);
+  const accessRole = resolveRoleKey(backendRole);
+  const visiblePages = accessRole ? PAGE_ACCESS[accessRole] ?? [] : [];
   const pageIsAllowed = visiblePages.includes(activePage);
   const displayedPage = pageIsAllowed
       ? activePage
@@ -135,7 +183,7 @@ function App() {
         return <ContentEditor />;
 
       case "Панель управления пользователями":
-        if (currentUser.role !== "admin") {
+        if (accessRole !== "admin") {
           return (
               <div className="m-6 rounded-xl bg-white p-6 text-[#776960]">
                 У вас нет доступа к панели управления пользователями.
@@ -203,6 +251,8 @@ function App() {
             onPageChange={setActivePage}
             visiblePages={visiblePages}
             onLogout={handleLogout}
+            userName={currentUser.name}
+            userRole={ROLE_LABELS[currentUser.role]}
         />
 
         <div className="min-w-0 flex-1 md:ml-64">

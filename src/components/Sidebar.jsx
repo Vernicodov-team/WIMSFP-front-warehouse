@@ -13,6 +13,8 @@ function Sidebar({
                      onPageChange,
                      visiblePages = [],
                      onLogout,
+                     userName,
+                     userRole,
                  }) {
     const visibleItems = menuItems.filter((item) =>
         visiblePages.includes(item.label)
@@ -57,14 +59,23 @@ function Sidebar({
             </nav>
 
             <div className="mt-auto border-t border-[#eee4dc] pt-3">
+                <div className="mb-2 rounded-xl px-3 py-2">
+                    <div className="truncate text-sm font-semibold text-[#45372f]">
+                        {userName}
+                    </div>
+                    <div className="mt-1 text-xs text-[#97877c]">
+                        {userRole}
+                    </div>
+                </div>
+
                 <button
                     type="button"
                     onClick={onLogout}
                     className="w-full rounded-[10px] px-3 py-3 text-left text-[13px] font-medium text-[#8b4b2b] transition hover:bg-[#fce5d3] hover:text-[#c85d18]"
                 >
-          <span className="mr-3 inline-block w-5 text-center" aria-hidden="true">
-            ↪
-          </span>
+                <span className="mr-3 inline-block w-5 text-center" aria-hidden="true">
+                  ↪
+                </span>
                     Выйти из аккаунта
                 </button>
             </div>
