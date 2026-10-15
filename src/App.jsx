@@ -13,8 +13,8 @@ import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
 
 const USERS_STORAGE_KEY = "warehouse.users";
 const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
-const AUTH_STORAGE_KEY = "warehouse.authenticated";
-const AUTH_USER_NAME_KEY = "warehouse.authUserName";
+const AUTH_TOKEN_KEY = "warehouse.authToken";
+const AUTH_USER_KEY = "warehouse.authUser";
 
 const INITIAL_USERS = [
   {
@@ -66,6 +66,29 @@ function readActiveUserId(users) {
   return users[0]?.id ?? INITIAL_USERS[0].id;
 }
 
+function readStoredAuthUser() {
+  try {
+    const savedUser = localStorage.getItem(AUTH_USER_KEY);
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function findRoleKey(role) {
+  if (typeof role !== "string") return null;
+
+  const normalizedRole = role.trim().toLowerCase();
+
+  return (
+      Object.keys(PAGE_ACCESS).find(
+          (key) =>
+              key.toLowerCase() === normalizedRole ||
+              String(ROLE_LABELS[key] ?? "").trim().toLowerCase() === normalizedRole
+      ) ?? null
+  );
+}
+
 function App() {
   const [users, setUsers] = useState(readUsers);
 
@@ -76,24 +99,35 @@ function App() {
   const [activePage, setActivePage] = useState("Главная");
   const [deliveriesRefreshKey, setDeliveriesRefreshKey] = useState(0);
 
-  const [isAuthenticated, setIsAuthenticated] = useState(
-      () => localStorage.getItem(AUTH_STORAGE_KEY) === "true"
+  const [authToken, setAuthToken] = useState(
+      () => localStorage.getItem(AUTH_TOKEN_KEY) || ""
   );
 
-  const [authenticatedUserName, setAuthenticatedUserName] = useState(
-      () => localStorage.getItem(AUTH_USER_NAME_KEY) || ""
-  );
+  const [authenticatedUser, setAuthenticatedUser] =
+      useState(readStoredAuthUser);
 
   const currentUser =
       users.find((user) => user.id === activeUserId) ??
       users[0] ??
       INITIAL_USERS[0];
 
-  const visiblePages = PAGE_ACCESS[currentUser.role] ?? ["Главная"];
+  const serverRoleKey = findRoleKey(authenticatedUser?.role);
+  const hasServerRole = Boolean(authenticatedUser?.role);
+
+  // Если сервер прислал роль, используем её. Неизвестная роль не получает доступ к меню.
+  const visiblePages = hasServerRole
+      ? serverRoleKey
+          ? PAGE_ACCESS[serverRoleKey] ?? []
+          : []
+      : PAGE_ACCESS[currentUser.role] ?? ["Главная"];
+
+  const effectiveRole = hasServerRole
+      ? serverRoleKey
+      : currentUser.role;
 
   const displayedPage = visiblePages.includes(activePage)
       ? activePage
-      : visiblePages[0] ?? "Главная";
+      : visiblePages[0] ?? "";
 
   useEffect(() => {
     try {
@@ -111,20 +145,20 @@ function App() {
     }
   }, [currentUser.id]);
 
-  function handleLogin(userName) {
-    localStorage.setItem(AUTH_STORAGE_KEY, "true");
-    localStorage.setItem(AUTH_USER_NAME_KEY, userName);
+  function handleLogin({ token, user }) {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 
-    setAuthenticatedUserName(userName);
-    setIsAuthenticated(true);
+    setAuthToken(token);
+    setAuthenticatedUser(user);
   }
 
   function handleLogout() {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem(AUTH_USER_NAME_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
 
-    setAuthenticatedUserName("");
-    setIsAuthenticated(false);
+    setAuthToken("");
+    setAuthenticatedUser(null);
   }
 
   function handleDeliveryCreated() {
@@ -156,7 +190,7 @@ function App() {
         return <SupplyInput onAddDelivery={handleDeliveryCreated} />;
 
       case "Панель управления пользователями":
-        if (currentUser.role !== "admin") {
+        if (effectiveRole !== "admin") {
           return (
               <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
                 У вас нет доступа к панели управления пользователями.
@@ -176,17 +210,24 @@ function App() {
         return (
             <section className="m-6 rounded-2xl border border-[#eee4dc] bg-white p-6 sm:m-8">
               <h1 className="text-2xl font-bold text-[#45372f]">
-                Раздел панели управления
+                {displayedPage ? "Раздел панели управления" : "Нет доступных разделов"}
               </h1>
-              <p className="mt-2 text-[#776960]">{displayedPage}</p>
+              {displayedPage && (
+                  <p className="mt-2 text-[#776960]">{displayedPage}</p>
+              )}
             </section>
         );
     }
   }
 
-  if (!isAuthenticated) {
+  if (!authToken) {
     return <Login onSuccess={handleLogin} />;
   }
+
+  const userName = authenticatedUser?.name || currentUser.name;
+  const userRole = authenticatedUser?.role
+      ? ROLE_LABELS[serverRoleKey] ?? authenticatedUser.role
+      : ROLE_LABELS[currentUser.role] ?? currentUser.role;
 
   return (
       <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
@@ -195,8 +236,8 @@ function App() {
             onPageChange={setActivePage}
             visiblePages={visiblePages}
             currentUser={currentUser}
-            userName={authenticatedUserName || currentUser.name}
-            userRole={ROLE_LABELS[currentUser.role] ?? currentUser.role}
+            userName={userName}
+            userRole={userRole}
             onLogout={handleLogout}
         />
 

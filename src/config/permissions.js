@@ -1,7 +1,7 @@
 export const ROLE_LABELS = {
     admin: "Администратор",
     waiter: "Официант",
-    warehouse: "Сотрудник склада",
+    acceptor: "Сотрудник склада",
     manager: "Менеджер",
 };
 
@@ -17,9 +17,9 @@ export const PAGE_ACCESS = {
         "Списания",
     ],
 
-    waiter: ["Главная", "История заказов"],
+    waiter: ["История заказов"],
 
-    warehouse: [
+    acceptor: [
         "Главная",
         "История поставок",
         "Склад",
