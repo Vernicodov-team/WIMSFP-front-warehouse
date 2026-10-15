@@ -7,6 +7,7 @@ import ContentEditor from "./pages/ContentEditor";
 import OrdersHistory from "./pages/OrdersHistory";
 import UsersManagement from "./pages/UsersManagement";
 import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
+import Login from "./pages/Login";
 
 const USERS_STORAGE_KEY = "warehouse.users";
 const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
@@ -68,6 +69,20 @@ function App() {
   );
   const [activePage, setActivePage] = useState("Главная");
 
+  const [authToken, setAuthToken] = useState(() =>
+      localStorage.getItem("warehouse.authToken")
+  );
+
+  function handleLogin(token) {
+    localStorage.setItem("warehouse.authToken", token);
+    setAuthToken(token);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("warehouse.authToken");
+    setAuthToken(null);
+  }
+
   const currentUser =
       users.find((user) => user.id === activeUserId) ?? users[0] ?? INITIAL_USERS[0];
 
@@ -92,9 +107,20 @@ function App() {
   }, [currentUser.id]);
 
   function renderPage() {
+    if (!authToken) {
+      return <Login onSuccess={handleLogin} />;
+    }
+
     if (!visiblePages.includes(displayedPage)) {
       return (
           <div className="m-6 rounded-xl bg-white p-6 text-[#776960]">
+            <button
+                type="button"
+                onClick={handleLogout}
+                className="fixed right-4 top-4 z-50 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#45372f] shadow hover:bg-orange-50"
+            >
+              Выйти
+            </button>
             У вас нет доступа к этому разделу.
           </div>
       );
