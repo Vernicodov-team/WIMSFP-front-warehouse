@@ -20,9 +20,9 @@ export default function Login({ onSuccess }) {
             <section className="w-full max-w-md rounded-2xl border border-[#eee4dc] bg-white p-8 shadow-sm sm:p-10">
                 <div className="mb-8 text-center">
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100">
-            <span className="text-2xl" aria-hidden="true">
-              📦
-            </span>
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100">
+                            <img src="/warehouse.svg" alt="Склад" className="h-8 w-8" />
+                        </div>
                     </div>
 
                     <h1 className="text-2xl font-bold">Складской модуль</h1>
