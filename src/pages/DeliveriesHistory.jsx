@@ -32,6 +32,12 @@ function normalizeUnit(unit) {
   return unit || "—";
 }
 
+function getDeliveryNumberValue(number) {
+  const digits = String(number || "").match(/\d+/);
+
+  return digits ? Number(digits[0]) : -1;
+}
+
 function normalizeDelivery(delivery, index) {
   const receivedProducts = Array.isArray(delivery.receivedProducts)
     ? delivery.receivedProducts
@@ -103,6 +109,13 @@ function isDateInPeriod(date, period) {
   return true;
 }
 
+function sortDeliveriesByNumber(firstDelivery, secondDelivery) {
+  return (
+    getDeliveryNumberValue(secondDelivery.number) -
+    getDeliveryNumberValue(firstDelivery.number)
+  );
+}
+
 function DeliveriesHistory({ refreshKey }) {
   const [deliveries, setDeliveries] = useState([]);
   const [search, setSearch] = useState("");
@@ -133,9 +146,9 @@ function DeliveriesHistory({ refreshKey }) {
 
         const deliveryList = Array.isArray(data) ? data : [data];
 
-        const normalizedDeliveries = deliveryList.map(
-          normalizeDelivery,
-        );
+        const normalizedDeliveries = deliveryList
+          .map(normalizeDelivery)
+          .sort(sortDeliveriesByNumber);
 
         if (isMounted) {
           setDeliveries(normalizedDeliveries);
@@ -165,20 +178,24 @@ function DeliveriesHistory({ refreshKey }) {
   const filteredDeliveries = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return deliveries.filter((delivery) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        delivery.number.toLowerCase().includes(normalizedSearch) ||
-        delivery.supplier.toLowerCase().includes(normalizedSearch) ||
-        delivery.products.some((product) =>
-          product.name.toLowerCase().includes(normalizedSearch),
+    return deliveries
+      .filter((delivery) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          delivery.number.toLowerCase().includes(normalizedSearch) ||
+          delivery.supplier.toLowerCase().includes(normalizedSearch) ||
+          delivery.products.some((product) =>
+            product.name.toLowerCase().includes(normalizedSearch),
+          );
+
+        const matchesPeriod = isDateInPeriod(
+          delivery.date,
+          period,
         );
 
-      return (
-        matchesSearch &&
-        isDateInPeriod(delivery.date, period)
-      );
-    });
+        return matchesSearch && matchesPeriod;
+      })
+      .sort(sortDeliveriesByNumber);
   }, [deliveries, search, period]);
 
   function resetFilters() {

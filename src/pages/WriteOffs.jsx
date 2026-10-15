@@ -1,36 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const initialWriteOffs = [
-  {
-    id: 1,
-    product: "Моцарелла",
-    quantity: 8,
-    unit: "кг",
-    expirationDate: "2026-10-12T00:00:00",
-    status: "Expired",
-  },
-  {
-    id: 2,
-    product: "Базилик",
-    quantity: 5,
-    unit: "кг",
-    expirationDate: "2026-10-08T00:00:00",
-    status: "Expired",
-  },
-  {
-    id: 3,
-    product: "Сливки 20%",
-    quantity: 3,
-    unit: "л",
-    expirationDate: "2026-10-10T00:00:00",
-    status: "Expired",
-  },
-];
-
-const expiredStatus = {
-  label: "Просрочено",
-  className: "bg-[#ffe1dd] text-[#c84d45]",
-};
+const API_URL = "http://localhost:5094/api/v1";
 
 function formatDate(date) {
   if (!date) {
@@ -41,8 +11,53 @@ function formatDate(date) {
 }
 
 function WriteOffs() {
-  const [writeOffs, setWriteOffs] = useState(initialWriteOffs);
+  const [writeOffs, setWriteOffs] = useState([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function loadExpiredStocks() {
+    try {
+      setIsLoading(true);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/Stock/GetExpiredStoks`,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Ошибка загрузки списаний: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          "Бэкенд вернул некорректный список списаний.",
+        );
+      }
+
+      setWriteOffs(data);
+    } catch (requestError) {
+      setWriteOffs([]);
+      setError(
+        requestError.message ||
+          "Не удалось загрузить просроченные продукты.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadExpiredStocks();
+  }, []);
 
   const filteredWriteOffs = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -52,30 +67,97 @@ function WriteOffs() {
     }
 
     return writeOffs.filter((writeOff) =>
-      writeOff.product.toLowerCase().includes(normalizedSearch),
+      String(writeOff.productType || "")
+        .toLowerCase()
+        .includes(normalizedSearch),
     );
   }, [writeOffs, search]);
 
-  function confirmWriteOff(writeOffId) {
-    setWriteOffs((currentWriteOffs) =>
-      currentWriteOffs.filter(
-        (writeOff) => writeOff.id !== writeOffId,
-      ),
-    );
+  async function confirmWriteOff(writeOff) {
+    const stockId = writeOff.id;
+
+    if (stockId === undefined || stockId === null) {
+      setError(
+        "У этой записи отсутствует id. Списание невозможно.",
+      );
+      return;
+    }
+
+    try {
+      setDeletingId(stockId);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/Stock/WriteOffStock/${stockId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Accept: "*/*",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const responseText = await response.text();
+
+        throw new Error(
+          responseText ||
+            `Ошибка подтверждения списания: ${response.status}`,
+        );
+      }
+
+      setWriteOffs((currentWriteOffs) =>
+        currentWriteOffs.filter(
+          (currentWriteOff) => currentWriteOff.id !== stockId,
+        ),
+      );
+
+      setSuccess("Списание подтверждено.");
+    } catch (requestError) {
+      setError(
+        requestError.message ||
+          "Не удалось подтвердить списание.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
-        <header className="mb-8">
-          <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
-            Списания
-          </h2>
+        <header className="mb-8 flex items-end justify-between">
+          <div>
+            <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
+              Списания
+            </h2>
 
-          <p className="mt-2 text-[14px] text-[#958278]">
-            Просроченные продукты, ожидающие списания
-          </p>
+            <p className="mt-2 text-[14px] text-[#958278]">
+              Просроченные продукты, ожидающие списания
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadExpiredStocks}
+            className="rounded-xl bg-[#fff0df] px-4 py-2.5 text-[12px] font-bold text-[#d9671b] transition hover:bg-[#ffe2cb]"
+          >
+            Обновить данные
+          </button>
         </header>
+
+        {error && (
+          <div className="mb-5 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-5 rounded-xl border border-[#b8dfb0] bg-[#e8f3e1] px-4 py-3 text-[13px] font-bold text-[#59874c]">
+            {success}
+          </div>
+        )}
 
         <section className="mb-5 rounded-[20px] border border-[#f0e2d8] bg-white p-5">
           <input
@@ -87,12 +169,14 @@ function WriteOffs() {
           />
 
           <div className="mt-3 text-[12px] text-[#a09187]">
-            Найдено продуктов: {filteredWriteOffs.length}
+            {isLoading
+              ? "Загрузка просроченных продуктов..."
+              : `Найдено продуктов: ${filteredWriteOffs.length}`}
           </div>
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-          <div className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1.5fr] gap-4 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+          <div className="grid grid-cols-[2fr_1fr_1.3fr_1.3fr_1.5fr] gap-4 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
             <div>Продукт</div>
             <div>Количество</div>
             <div>Срок годности</div>
@@ -100,47 +184,56 @@ function WriteOffs() {
             <div />
           </div>
 
-          {filteredWriteOffs.length === 0 ? (
+          {isLoading ? (
+            <div className="p-10 text-center text-[14px] text-[#958278]">
+              Загружаем данные...
+            </div>
+          ) : filteredWriteOffs.length === 0 ? (
             <div className="p-10 text-center text-[14px] text-[#958278]">
               Просроченные продукты не найдены.
             </div>
           ) : (
-            filteredWriteOffs.map((writeOff) => (
-              <div
-                key={writeOff.id}
-                className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1.5fr] items-center gap-4 border-t border-[#f3e9e2] px-6 py-5 text-[12px]"
-              >
-                <div className="font-extrabold text-[#493e38]">
-                  {writeOff.product}
-                </div>
+            filteredWriteOffs.map((writeOff) => {
+              const isDeleting = deletingId === writeOff.id;
 
-                <div className="text-[#665850]">
-                  {writeOff.quantity} {writeOff.unit}
-                </div>
+              return (
+                <div
+                  key={writeOff.id}
+                  className="grid grid-cols-[2fr_1fr_1.3fr_1.3fr_1.5fr] items-center gap-4 border-t border-[#f3e9e2] px-6 py-5 text-[12px]"
+                >
+                  <div className="font-extrabold text-[#493e38]">
+                    {writeOff.productType || "Без названия"}
+                  </div>
 
-                <div className="text-[#c84d45]">
-                  {formatDate(writeOff.expirationDate)}
-                </div>
+                  <div className="text-[#665850]">
+                    {writeOff.amount ?? 0}
+                  </div>
 
-                <div>
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold ${expiredStatus.className}`}
-                  >
-                    {expiredStatus.label}
-                  </span>
-                </div>
+                  <div className="text-[#c84d45]">
+                    {formatDate(writeOff.dateExpired)}
+                  </div>
 
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => confirmWriteOff(writeOff.id)}
-                    className="rounded-xl bg-[#e96d1b] px-4 py-2 text-[11px] font-bold text-white transition hover:bg-[#d95e12]"
-                  >
-                    Подтвердить списание
-                  </button>
+                  <div>
+                    <span className="inline-flex rounded-full bg-[#ffe1dd] px-3 py-1 text-[10px] font-bold text-[#c84d45]">
+                      Просрочено
+                    </span>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => confirmWriteOff(writeOff)}
+                      disabled={isDeleting}
+                      className="rounded-xl bg-[#e96d1b] px-4 py-2 text-[11px] font-bold text-white transition hover:bg-[#d95e12] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isDeleting
+                        ? "Списание..."
+                        : "Подтвердить списание"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </section>
       </div>
