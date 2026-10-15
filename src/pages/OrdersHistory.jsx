@@ -1,116 +1,32 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const orders = [
-  {
-    id: 1042,
-    date: "2026-10-14T12:40:00",
-    status: "Completed",
-    total: 1430,
-    dishes: [
-      {
-        name: "Борщ с говядиной",
-        quantity: 1,
-        price: 490,
-      },
-      {
-        name: "Паста с курицей",
-        quantity: 1,
-        price: 590,
-      },
-      {
-        name: "Овощной салат",
-        quantity: 1,
-        price: 350,
-      },
-    ],
-  },
-  {
-    id: 1041,
-    date: "2026-10-14T11:25:00",
-    status: "Completed",
-    total: 980,
-    dishes: [
-      {
-        name: "Пицца Маргарита",
-        quantity: 1,
-        price: 650,
-      },
-      {
-        name: "Лимонад",
-        quantity: 2,
-        price: 165,
-      },
-    ],
-  },
-  {
-    id: 1040,
-    date: "2026-10-13T19:10:00",
-    status: "Completed",
-    total: 1890,
-    dishes: [
-      {
-        name: "Стейк с картофелем",
-        quantity: 1,
-        price: 1290,
-      },
-      {
-        name: "Овощи гриль",
-        quantity: 1,
-        price: 600,
-      },
-    ],
-  },
-  {
-    id: 1039,
-    date: "2026-10-13T16:45:00",
-    status: "Completed",
-    total: 1250,
-    dishes: [
-      {
-        name: "Крем-суп с шампиньонами",
-        quantity: 1,
-        price: 420,
-      },
-      {
-        name: "Овощной салат",
-        quantity: 1,
-        price: 350,
-      },
-      {
-        name: "Чизкейк",
-        quantity: 1,
-        price: 480,
-      },
-    ],
-  },
-  {
-    id: 1038,
-    date: "2026-10-12T14:20:00",
-    status: "Completed",
-    total: 870,
-    dishes: [
-      {
-        name: "Борщ с говядиной",
-        quantity: 1,
-        price: 490,
-      },
-      {
-        name: "Морс",
-        quantity: 2,
-        price: 190,
-      },
-    ],
-  },
-];
+const API_URL = "http://localhost:5094/api/v1";
 
 const orderStatusConfig = {
   Completed: {
     label: "Выполнен",
     className: "bg-[#e8f3e1] text-[#59874c]",
   },
+  Active: {
+    label: "Активен",
+    className: "bg-[#fff0c9] text-[#b8791b]",
+  },
+  Cancelled: {
+    label: "Отменён",
+    className: "bg-[#ffe1dd] text-[#c84d45]",
+  },
+};
+
+const orderFormatConfig = {
+  0: "В ресторане",
+  1: "Самовывоз",
 };
 
 function formatDateTime(date) {
+  if (!date) {
+    return "—";
+  }
+
   return new Date(date).toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
@@ -120,8 +36,34 @@ function formatDateTime(date) {
   });
 }
 
+function formatDateOnly(date) {
+  if (!date) {
+    return "—";
+  }
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toISOString().slice(0, 10);
+}
+
 function formatMoney(value) {
-  return `${value.toLocaleString("ru-RU")} ₽`;
+  return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
+}
+
+function getOrderFormat(format) {
+  return (
+    orderFormatConfig[format] ||
+    orderFormatConfig[String(format)] ||
+    "Неизвестный формат"
+  );
+}
+
+function getStatusConfig(status) {
+  return orderStatusConfig[status] || null;
 }
 
 function isDateInPeriod(date, period) {
@@ -129,8 +71,12 @@ function isDateInPeriod(date, period) {
     return true;
   }
 
+  if (!date) {
+    return false;
+  }
+
   const orderDate = new Date(date);
-  const today = new Date("2026-10-14T23:59:59");
+  const today = new Date();
 
   if (period === "today") {
     return orderDate.toDateString() === today.toDateString();
@@ -153,10 +99,101 @@ function isDateInPeriod(date, period) {
   return true;
 }
 
+function normalizeOrder(order, index) {
+  const dishes = Array.isArray(order.dishes)
+    ? order.dishes.map((dish, dishIndex) => {
+        const price = Number(dish.dishPrice || 0);
+        const quantity = Number(dish.count || 0);
+
+        return {
+          id: `${index}-${dishIndex}`,
+          name: dish.dishName || "Без названия",
+          price,
+          quantity,
+          total: price * quantity,
+        };
+      })
+    : [];
+
+  const calculatedTotal = dishes.reduce(
+    (total, dish) => total + dish.total,
+    0,
+  );
+
+  return {
+    id: order.id || `${order.created}-${index}`,
+    number: formatDateOnly(order.created),
+    created: order.created,
+    payment: Number(order.payment ?? calculatedTotal),
+    status: order.status,
+    customerName: order.customerName || "—",
+    contactPhone: order.contactPhone || "—",
+    format: getOrderFormat(order.format),
+    comment: order.comment || "",
+    dishes,
+  };
+}
+
 function OrdersHistory() {
+  const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadOrders() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/order/getOrderList`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Ошибка загрузки заказов: ${response.status}`,
+          );
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error(
+            "Бэкенд вернул некорректный список заказов.",
+          );
+        }
+
+        const normalizedOrders = data.map(normalizeOrder);
+
+        if (isMounted) {
+          setOrders(normalizedOrders);
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setOrders([]);
+          setError(
+            requestError.message ||
+              "Не удалось загрузить историю заказов.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadOrders();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -164,16 +201,18 @@ function OrdersHistory() {
     return orders.filter((order) => {
       const matchesSearch =
         !normalizedSearch ||
-        String(order.id).includes(normalizedSearch) ||
+        order.number.toLowerCase().includes(normalizedSearch) ||
+        order.customerName.toLowerCase().includes(normalizedSearch) ||
+        order.contactPhone.toLowerCase().includes(normalizedSearch) ||
         order.dishes.some((dish) =>
           dish.name.toLowerCase().includes(normalizedSearch),
         );
 
-      const matchesPeriod = isDateInPeriod(order.date, period);
+      const matchesPeriod = isDateInPeriod(order.created, period);
 
       return matchesSearch && matchesPeriod;
     });
-  }, [search, period]);
+  }, [orders, search, period]);
 
   function resetFilters() {
     setSearch("");
@@ -181,10 +220,19 @@ function OrdersHistory() {
   }
 
   function toggleOrder(orderId) {
-    setExpandedOrder((currentOrder) =>
-      currentOrder === orderId ? null : orderId,
+    setExpandedOrder((currentId) =>
+      currentId === orderId ? null : orderId,
     );
   }
+
+  const totalRevenue = orders.reduce(
+    (total, order) => total + order.payment,
+    0,
+  );
+
+  const ordersThisMonth = orders.filter((order) =>
+    isDateInPeriod(order.created, "month"),
+  ).length;
 
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
@@ -195,33 +243,39 @@ function OrdersHistory() {
           </h2>
 
           <p className="mt-2 text-[14px] text-[#958278]">
-            Все выполненные заказы ресторана
+            Все заказы ресторана и их состав
           </p>
         </header>
 
+        {error && (
+          <div className="mb-5 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+            {error}
+          </div>
+        )}
+
         <section className="mb-8 grid grid-cols-3 gap-4">
           <StatCard
-            title="Заказов сегодня"
-            value="2"
-            description="выполненных заказа"
+            title="Всего заказов"
+            value={orders.length}
+            description="по данным сервера"
             icon="▣"
             color="bg-[#fff0df] text-[#d9671b]"
           />
 
           <StatCard
-            title="Выполнено"
-            value="2"
-            description="за текущий день"
-            icon="✓"
-            color="bg-[#e8f3e1] text-[#659251]"
+            title="Заказов за месяц"
+            value={ordersThisMonth}
+            description="за текущий месяц"
+            icon="↗"
+            color="bg-[#fff4d8] text-[#c8881b]"
           />
 
           <StatCard
-            title="Выручка"
-            value="2 410 ₽"
-            description="за текущий день"
+            title="Общая выручка"
+            value={formatMoney(totalRevenue)}
+            description="по всем заказам"
             icon="₽"
-            color="bg-[#fff4d8] text-[#c8881b]"
+            color="bg-[#e8f3e1] text-[#659251]"
           />
         </section>
 
@@ -231,7 +285,7 @@ function OrdersHistory() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Поиск по номеру заказа или блюду..."
+              placeholder="Поиск по номеру, клиенту, телефону или блюду..."
               className="h-11 min-w-0 flex-1 rounded-xl border border-[#eaded5] bg-[#fffdfb] px-4 text-[13px] placeholder:text-[#aa9d94] focus:border-[#eb701c] focus:outline-none"
             />
 
@@ -256,95 +310,104 @@ function OrdersHistory() {
           </div>
 
           <div className="mt-3 text-[12px] text-[#a09187]">
-            Найдено заказов: {filteredOrders.length}
+            {isLoading
+              ? "Загрузка заказов..."
+              : `Найдено заказов: ${filteredOrders.length}`}
           </div>
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-          <div className="grid grid-cols-[1fr_1.2fr_2fr_1fr_1fr_60px] gap-4 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
-            <div>Номер заказа</div>
+          <div className="grid grid-cols-[1fr_1.3fr_1.4fr_1.3fr_1fr_60px] gap-4 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+            <div>Заказ</div>
             <div>Дата и время</div>
-            <div>Состав заказа</div>
-            <div>Количество</div>
+            <div>Клиент</div>
+            <div>Телефон</div>
             <div>Сумма</div>
             <div />
           </div>
 
           {filteredOrders.length === 0 ? (
             <div className="p-10 text-center text-[14px] text-[#958278]">
-              Заказы не найдены.
+              {isLoading
+                ? "Загрузка заказов..."
+                : "Заказы не найдены."}
             </div>
           ) : (
             filteredOrders.map((order) => {
               const isExpanded = expandedOrder === order.id;
+              const status = getStatusConfig(order.status);
 
               return (
                 <div key={order.id}>
-                  <button
-                    type="button"
-                    onClick={() => toggleOrder(order.id)}
-                    className="grid w-full grid-cols-[1fr_1.2fr_2fr_1fr_1fr_60px] items-center gap-4 border-t border-[#f3e9e2] px-6 py-5 text-left text-[12px] transition hover:bg-[#fffaf7]"
-                  >
-                    <span className="font-extrabold text-[#493e38]">
-                      Заказ #{order.id}
-                    </span>
+                  <div className="grid grid-cols-[1fr_1.3fr_1.4fr_1.3fr_1fr_60px] items-center gap-4 border-t border-[#f3e9e2] px-6 py-4 text-[12px]">
+                    <div className="font-extrabold text-[#493e38]">
+                      {order.number}
+                    </div>
 
-                    <span className="text-[#85766d]">
-                      {formatDateTime(order.date)}
-                    </span>
+                    <div className="text-[#85766d]">
+                      {formatDateTime(order.created)}
+                    </div>
 
-                    <span className="truncate text-[#665850]">
-                      {order.dishes.map((dish) => dish.name).join(", ")}
-                    </span>
+                    <div className="text-[#665850]">
+                      {order.customerName}
+                    </div>
 
-                    <span className="text-[#85766d]">
-                      {order.dishes.reduce(
-                        (total, dish) => total + dish.quantity,
-                        0,
-                      )}
-                    </span>
+                    <div className="text-[#85766d]">
+                      {order.contactPhone}
+                    </div>
 
-                    <span className="font-bold text-[#665850]">
-                      {formatMoney(order.total)}
-                    </span>
+                    <div className="font-bold text-[#665850]">
+                      {formatMoney(order.payment)}
+                    </div>
 
-                    <span className="flex justify-end">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0df] text-[#dc681c]">
-                        <span
-                          className={`transition-transform ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
-                        >
-                          ↓
-                        </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleOrder(order.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0df] text-[#dc681c] transition hover:bg-[#ffe0c2]"
+                      title="Показать состав заказа"
+                    >
+                      <span
+                        className={`transition-transform ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                      >
+                        ↓
                       </span>
-                    </span>
-                  </button>
+                    </button>
+                  </div>
 
                   {isExpanded && (
                     <div className="border-t border-[#f3e9e2] bg-[#fffaf6] px-6 py-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="text-[12px] font-extrabold text-[#594a42]">
-                          Состав заказа #{order.id}
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <div className="text-[12px] font-extrabold text-[#594a42]">
+                            Состав заказа {order.number}
+                          </div>
+
+                          <div className="mt-1 text-[11px] text-[#958278]">
+                            Формат: {order.format}
+                          </div>
                         </div>
 
-                        <span
-                          className={`rounded-full px-3 py-1 text-[10px] font-bold ${orderStatusConfig.Completed.className}`}
-                        >
-                          {orderStatusConfig.Completed.label}
-                        </span>
+                    {status && (
+                    <span
+                      className={`rounded-full px-3 py-1 text-[10px] font-bold ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                      )}
                       </div>
 
                       <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
                         <div>Блюдо</div>
                         <div>Количество</div>
                         <div>Цена</div>
-                        <div>Сумма</div>
+                        <div>Стоимость (С учетом акций)</div>
                       </div>
 
                       {order.dishes.map((dish) => (
                         <div
-                          key={dish.name}
+                          key={dish.id}
                           className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
                         >
                           <div className="font-bold text-[#493e38]">
@@ -352,17 +415,19 @@ function OrdersHistory() {
                           </div>
 
                           <div>{dish.quantity}</div>
-
                           <div>{formatMoney(dish.price)}</div>
-
-                          <div>
-                            {formatMoney(dish.price * dish.quantity)}
-                          </div>
+                          <div>{formatMoney(dish.total)}</div>
                         </div>
                       ))}
 
+                      {order.comment && (
+                        <div className="mt-3 border-t border-[#eaded5] pt-3 text-[12px] text-[#766960]">
+                          Комментарий: {order.comment}
+                        </div>
+                      )}
+
                       <div className="mt-3 flex justify-end border-t border-[#eaded5] pt-3 text-[14px] font-extrabold text-[#493e38]">
-                        Итого: {formatMoney(order.total)}
+                        Итого: {formatMoney(order.payment)}
                       </div>
                     </div>
                   )}

@@ -1,18 +1,73 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const API_URL = "http://localhost:5094/api/v1";
 
 function formatDate(date) {
   if (!date) {
     return "—";
   }
 
-  const normalizedDate =
-    date.length === 10 ? `${date}T00:00:00` : date;
-
-  return new Date(normalizedDate).toLocaleDateString("ru-RU");
+  return new Date(date).toLocaleDateString("ru-RU");
 }
 
 function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
+}
+
+function normalizeUnit(unit) {
+  const normalizedUnit = String(unit || "").toLowerCase();
+
+  if (normalizedUnit === "item") {
+    return "шт.";
+  }
+
+  if (normalizedUnit === "kilogram") {
+    return "кг";
+  }
+
+  if (normalizedUnit === "liter") {
+    return "л";
+  }
+
+  return unit || "—";
+}
+
+function normalizeDelivery(delivery, index) {
+  const receivedProducts = Array.isArray(delivery.receivedProducts)
+    ? delivery.receivedProducts
+    : [];
+
+  const products = receivedProducts.map((product, productIndex) => ({
+    id: `${delivery.number || index}-${productIndex}`,
+    name: product.productName || "Без названия",
+    quantity: Number(product.count || 0),
+    unit: normalizeUnit(product.unit),
+    productionDate: delivery.dateReceived || null,
+    expirationDate: product.expirationDate || null,
+    price: Number(product.itemPrice || 0),
+    cost:
+      Number(product.count || 0) * Number(product.itemPrice || 0),
+  }));
+
+  const calculatedCost = products.reduce(
+    (total, product) => total + product.cost,
+    0,
+  );
+
+  const totalWeight = products.reduce(
+    (total, product) => total + product.quantity,
+    0,
+  );
+
+  return {
+    id: delivery.id || delivery.number || `delivery-${index}`,
+    number: delivery.number || "Без номера",
+    date: delivery.dateReceived || null,
+    supplier: delivery.supplierName || "—",
+    totalWeight: delivery.totalWeight ?? totalWeight,
+    cost: delivery.price ?? calculatedCost,
+    products,
+  };
 }
 
 function isDateInPeriod(date, period) {
@@ -24,11 +79,11 @@ function isDateInPeriod(date, period) {
     return false;
   }
 
-  const deliveryDate = new Date(`${date}T00:00:00`);
-  const today = new Date("2026-10-14T00:00:00");
+  const deliveryDate = new Date(date);
+  const today = new Date();
 
   if (period === "today") {
-    return date === "2026-10-14";
+    return deliveryDate.toDateString() === today.toDateString();
   }
 
   if (period === "week") {
@@ -48,36 +103,81 @@ function isDateInPeriod(date, period) {
   return true;
 }
 
-function DeliveriesHistory({ deliveries = [] }) {
+function DeliveriesHistory({ refreshKey }) {
+  const [deliveries, setDeliveries] = useState([]);
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
   const [expandedDelivery, setExpandedDelivery] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDeliveries() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/supply/GetDeliveries`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Ошибка загрузки поставок: ${response.status}`,
+          );
+        }
+
+        const data = await response.json();
+
+        const deliveryList = Array.isArray(data) ? data : [data];
+
+        const normalizedDeliveries = deliveryList.map(
+          normalizeDelivery,
+        );
+
+        if (isMounted) {
+          setDeliveries(normalizedDeliveries);
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setDeliveries([]);
+          setError(
+            requestError.message ||
+              "Не удалось загрузить историю поставок.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadDeliveries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
 
   const filteredDeliveries = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return deliveries.filter((delivery) => {
-      const products = Array.isArray(delivery.products)
-        ? delivery.products
-        : [];
-
       const matchesSearch =
         !normalizedSearch ||
-        String(delivery.number || "")
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        String(delivery.supplier || "")
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        products.some((product) =>
-          String(product.name || "")
-            .toLowerCase()
-            .includes(normalizedSearch),
+        delivery.number.toLowerCase().includes(normalizedSearch) ||
+        delivery.supplier.toLowerCase().includes(normalizedSearch) ||
+        delivery.products.some((product) =>
+          product.name.toLowerCase().includes(normalizedSearch),
         );
 
-      const matchesPeriod = isDateInPeriod(delivery.date, period);
-
-      return matchesSearch && matchesPeriod;
+      return (
+        matchesSearch &&
+        isDateInPeriod(delivery.date, period)
+      );
     });
   }, [deliveries, search, period]);
 
@@ -114,11 +214,17 @@ function DeliveriesHistory({ deliveries = [] }) {
           </p>
         </header>
 
+        {error && (
+          <div className="mb-5 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+            {error}
+          </div>
+        )}
+
         <section className="mb-8 grid grid-cols-3 gap-4">
           <StatCard
             title="Всего поставок"
             value={deliveries.length}
-            description="за всё время"
+            description="по данным сервера"
             icon="▣"
             color="bg-[#fff0df] text-[#d9671b]"
           />
@@ -134,7 +240,7 @@ function DeliveriesHistory({ deliveries = [] }) {
           <StatCard
             title="Общая стоимость"
             value={formatMoney(totalCost)}
-            description="по всем поставкам"
+            description="по данным сервера"
             icon="₽"
             color="bg-[#ffe5c9] text-[#d9671b]"
           />
@@ -171,14 +277,16 @@ function DeliveriesHistory({ deliveries = [] }) {
           </div>
 
           <div className="mt-3 text-[12px] text-[#a09187]">
-            Найдено поставок: {filteredDeliveries.length}
+            {isLoading
+              ? "Загрузка поставок..."
+              : `Найдено поставок: ${filteredDeliveries.length}`}
           </div>
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
           <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_60px] gap-3 bg-[#fffaf7] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
             <div>Поставка</div>
-            <div>Дата</div>
+            <div>Дата получения</div>
             <div>Поставщик</div>
             <div>Позиций</div>
             <div>Количество</div>
@@ -188,20 +296,20 @@ function DeliveriesHistory({ deliveries = [] }) {
 
           {filteredDeliveries.length === 0 ? (
             <div className="p-10 text-center text-[14px] text-[#958278]">
-              По выбранным параметрам поставки не найдены.
+              {isLoading
+                ? "Загрузка поставок..."
+                : "Поставки не найдены."}
             </div>
           ) : (
             filteredDeliveries.map((delivery) => {
-              const isExpanded = expandedDelivery === delivery.id;
-              const products = Array.isArray(delivery.products)
-                ? delivery.products
-                : [];
+              const isExpanded =
+                expandedDelivery === delivery.id;
 
               return (
                 <div key={delivery.id}>
                   <div className="grid grid-cols-[1fr_1fr_1.5fr_0.7fr_0.9fr_1fr_60px] items-center gap-3 border-t border-[#f3e9e2] px-6 py-4 text-[12px]">
                     <div className="font-extrabold text-[#493e38]">
-                      {delivery.number || "Без номера"}
+                      {delivery.number}
                     </div>
 
                     <div className="text-[#85766d]">
@@ -209,15 +317,15 @@ function DeliveriesHistory({ deliveries = [] }) {
                     </div>
 
                     <div className="text-[#665850]">
-                      {delivery.supplier || "—"}
+                      {delivery.supplier}
                     </div>
 
                     <div className="text-[#85766d]">
-                      {products.length}
+                      {delivery.products.length}
                     </div>
 
                     <div className="text-[#85766d]">
-                      {delivery.totalWeight || 0}
+                      {delivery.totalWeight}
                     </div>
 
                     <div className="font-bold text-[#665850]">
@@ -228,7 +336,6 @@ function DeliveriesHistory({ deliveries = [] }) {
                       type="button"
                       onClick={() => toggleDelivery(delivery.id)}
                       className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0df] text-[#dc681c] transition hover:bg-[#ffe0c2]"
-                      title="Показать продукты"
                     >
                       <span
                         className={`transition-transform ${
@@ -243,10 +350,10 @@ function DeliveriesHistory({ deliveries = [] }) {
                   {isExpanded && (
                     <div className="border-t border-[#f3e9e2] bg-[#fffaf6] px-6 py-4">
                       <div className="mb-3 text-[12px] font-extrabold text-[#594a42]">
-                        Состав поставки {delivery.number || ""}
+                        Состав поставки {delivery.number}
                       </div>
 
-                      <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+                      <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-extrabold uppercase text-[#aa9b91]">
                         <div>Продукт</div>
                         <div>Количество</div>
                         <div>Единица</div>
@@ -256,17 +363,17 @@ function DeliveriesHistory({ deliveries = [] }) {
                         <div>Стоимость</div>
                       </div>
 
-                      {products.map((product, index) => (
+                      {delivery.products.map((product) => (
                         <div
-                          key={`${product.name}-${index}`}
+                          key={product.id}
                           className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
                         >
                           <div className="font-bold text-[#493e38]">
                             {product.name}
                           </div>
 
-                          <div>{product.quantity || 0}</div>
-                          <div>{product.unit || "—"}</div>
+                          <div>{product.quantity}</div>
+                          <div>{product.unit}</div>
                           <div>
                             {formatDate(product.productionDate)}
                           </div>

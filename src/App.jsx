@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
-import { initialDeliveries } from "./data/deliveries";
 import Warehouse from "./pages/Warehouse";
 import ContentEditor from "./pages/ContentEditor";
 import OrdersHistory from "./pages/OrdersHistory";
@@ -57,7 +56,7 @@ function readActiveUserId(users) {
       return savedId;
     }
   } catch {
-    // Если localStorage недоступен, используется первый пользователь.
+    // Используем первого пользователя.
   }
 
   return users[0]?.id ?? INITIAL_USERS[0].id;
@@ -65,11 +64,15 @@ function readActiveUserId(users) {
 
 function App() {
   const [users, setUsers] = useState(readUsers);
+
   const [activeUserId, setActiveUserId] = useState(() =>
     readActiveUserId(readUsers()),
   );
+
   const [activePage, setActivePage] = useState("Главная");
-  const [deliveries, setDeliveries] = useState(initialDeliveries);
+
+  // Меняется после успешного добавления поставки.
+  const [deliveriesRefreshKey, setDeliveriesRefreshKey] = useState(0);
 
   const currentUser =
     users.find((user) => user.id === activeUserId) ??
@@ -86,7 +89,7 @@ function App() {
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     } catch {
-      // Приложение продолжит работать до перезагрузки страницы.
+      // Работа продолжается до обновления страницы.
     }
   }, [users]);
 
@@ -97,34 +100,43 @@ function App() {
         currentUser.id,
       );
     } catch {
-      // Переключение пользователя продолжит работать в текущей сессии.
+      // Переключение работает в текущей сессии.
     }
   }, [currentUser.id]);
 
-  function addDelivery(newDelivery) {
-    setDeliveries((currentDeliveries) => [
-      newDelivery,
-      ...currentDeliveries,
-    ]);
-
+  function handleDeliveryCreated() {
+    setDeliveriesRefreshKey((currentKey) => currentKey + 1);
     setActivePage("История поставок");
   }
 
-  function renderPage() {
-    if (!visiblePages.includes(displayedPage)) {
-      return (
-        <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
-          У вас нет доступа к этому разделу.
-        </div>
-      );
+  function handleActiveUserChange(event) {
+    const nextUserId = event.target.value;
+    const nextUser = users.find((user) => user.id === nextUserId);
+
+    if (!nextUser) {
+      return;
     }
 
+    setActiveUserId(nextUserId);
+
+    const nextPages = PAGE_ACCESS[nextUser.role] ?? ["Главная"];
+
+    if (!nextPages.includes(activePage)) {
+      setActivePage(nextPages[0] ?? "Главная");
+    }
+  }
+
+  function renderPage() {
     switch (displayedPage) {
       case "Главная":
         return <Dashboard />;
 
       case "История поставок":
-        return <DeliveriesHistory deliveries={deliveries} />;
+        return (
+          <DeliveriesHistory
+            refreshKey={deliveriesRefreshKey}
+          />
+        );
 
       case "Склад":
         return <Warehouse />;
@@ -136,7 +148,11 @@ function App() {
         return <ContentEditor />;
 
       case "Ввод поставок":
-        return <SupplyInput onAddDelivery={addDelivery} />;
+        return (
+          <SupplyInput
+            onAddDelivery={handleDeliveryCreated}
+          />
+        );
 
       case "Панель управления пользователями":
         if (currentUser.role !== "admin") {
@@ -167,23 +183,6 @@ function App() {
             </p>
           </section>
         );
-    }
-  }
-
-  function handleActiveUserChange(event) {
-    const nextUserId = event.target.value;
-    const nextUser = users.find((user) => user.id === nextUserId);
-
-    if (!nextUser) {
-      return;
-    }
-
-    setActiveUserId(nextUserId);
-
-    const nextPages = PAGE_ACCESS[nextUser.role] ?? ["Главная"];
-
-    if (!nextPages.includes(activePage)) {
-      setActivePage(nextPages[0] ?? "Главная");
     }
   }
 
