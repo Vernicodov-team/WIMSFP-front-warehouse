@@ -1,3 +1,50 @@
+import { useEffect, useState } from "react";
+
+const MONTHS_SHORT = [
+  "янв.",
+  "фев.",
+  "мар.",
+  "апр.",
+  "май",
+  "июн.",
+  "июл.",
+  "авг.",
+  "сент.",
+  "окт.",
+  "нояб.",
+  "дек.",
+];
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
+    },
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(text || `Ошибка API: ${response.status}`);
+  }
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
+}
+
 const statistics = [
   {
     title: "Всего продуктов",
@@ -108,18 +155,101 @@ const expirationProducts = [
   },
 ];
 
-const financeData = [
-  { day: "1 окт.", revenue: 72, expenses: 45 },
-  { day: "5 окт.", revenue: 88, expenses: 52 },
-  { day: "9 окт.", revenue: 64, expenses: 38 },
-  { day: "13 окт.", revenue: 96, expenses: 57 },
-  { day: "17 окт.", revenue: 78, expenses: 48 },
-  { day: "21 окт.", revenue: 91, expenses: 54 },
-  { day: "25 окт.", revenue: 83, expenses: 49 },
-  { day: "31 окт.", revenue: 100, expenses: 62 },
-];
-
 function Dashboard() {
+  const [financeData, setFinanceData] = useState([]);
+  const [financesLoading, setFinancesLoading] = useState(true);
+  const [financesError, setFinancesError] = useState("");
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFinances() {
+      try {
+        const data = await apiRequest("/api/v1/dashboard/FinanceAnalitics");
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isActive) {
+          setFinanceData(list);
+          setFinancesError("");
+        }
+      } catch {
+        if (isActive) {
+          setFinancesError("Не удалось загрузить данные по финансам.");
+        }
+      } finally {
+        if (isActive) {
+          setFinancesLoading(false);
+        }
+      }
+    }
+
+    loadFinances();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const financePoints = financeData.map((item) => ({
+    key: `${item.year}-${item.month}`,
+    label: `${MONTHS_SHORT[item.month - 1] ?? item.month} ${String(
+      item.year ?? "",
+    ).slice(-2)}`,
+    revenue: Number(item.income) || 0,
+    expenses: Number(item.expense) || 0,
+  }));
+
+  const financeMax = financePoints.reduce(
+    (max, item) => Math.max(max, item.revenue, item.expenses),
+    0,
+  );
+
+  const latestFinance = financeData.reduce((latest, item) => {
+    if (!latest) {
+      return item;
+    }
+
+    const itemOrder = (Number(item.year) || 0) * 12 + (Number(item.month) || 0);
+    const latestOrder =
+      (Number(latest.year) || 0) * 12 + (Number(latest.month) || 0);
+
+    return itemOrder > latestOrder ? item : latest;
+  }, null);
+
+  const displayedStatistics = statistics.map((statistic) =>
+    statistic.finance
+      ? {
+          ...statistic,
+          finance: [
+            {
+              title: "Общая выручка",
+              value: latestFinance ? formatMoney(latestFinance.income) : "—",
+              valueClass: "text-[#659251]",
+            },
+            {
+              title: "Общие затраты",
+              value: latestFinance ? formatMoney(latestFinance.expense) : "—",
+              valueClass: "text-[#c84d45]",
+            },
+          ],
+        }
+      : statistic,
+  );
+
+  function barHeight(value) {
+    if (!financeMax || value <= 0) {
+      return 0;
+    }
+
+    return Math.max(4, Math.round((value / financeMax) * 100));
+  }
+
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
@@ -145,7 +275,7 @@ function Dashboard() {
           </h3>
 
           <div className="grid grid-cols-3 gap-4">
-            {statistics.map((statistic) => (
+            {displayedStatistics.map((statistic) => (
               <article
                 key={statistic.title}
                 className="rounded-[20px] border border-[#f0e2d8] bg-white p-5 shadow-[0_5px_18px_rgba(120,75,40,0.04)]"
@@ -222,7 +352,7 @@ function Dashboard() {
               </h3>
 
               <p className="mt-1 text-[13px] text-[#a09187]">
-                Сравнение показателей за текущий месяц
+                Сравнение показателей по месяцам
               </p>
             </div>
 
@@ -240,28 +370,42 @@ function Dashboard() {
           </div>
 
           <div className="flex h-[260px] items-end gap-5 border-b border-l border-[#eaded5] px-5 pb-0 pt-5">
-            {financeData.map((item) => (
-              <div
-                key={item.day}
-                className="relative flex h-full flex-1 items-end justify-center gap-2"
-              >
-                <div
-                  className="w-6 rounded-t-md bg-[#82b274] transition hover:bg-[#6d9f60]"
-                  style={{ height: `${item.revenue}%` }}
-                  title={`Выручка: ${item.revenue}`}
-                />
-
-                <div
-                  className="w-6 rounded-t-md bg-[#e96d1b] transition hover:bg-[#d85e12]"
-                  style={{ height: `${item.expenses}%` }}
-                  title={`Затраты: ${item.expenses}`}
-                />
-
-                <span className="absolute translate-y-7 text-[10px] text-[#a09187]">
-                  {item.day}
-                </span>
+            {financesLoading ? (
+              <div className="w-full pb-24 text-center text-[13px] text-[#a09187]">
+                Загрузка данных...
               </div>
-            ))}
+            ) : financesError ? (
+              <div className="w-full pb-24 text-center text-[13px] text-[#c84d45]">
+                {financesError}
+              </div>
+            ) : financePoints.length === 0 ? (
+              <div className="w-full pb-24 text-center text-[13px] text-[#a09187]">
+                Нет данных за выбранный период.
+              </div>
+            ) : (
+              financePoints.map((item) => (
+                <div
+                  key={item.key}
+                  className="relative flex h-full flex-1 items-end justify-center gap-2"
+                >
+                  <div
+                    className="w-6 rounded-t-md bg-[#82b274] transition hover:bg-[#6d9f60]"
+                    style={{ height: `${barHeight(item.revenue)}%` }}
+                    title={`Выручка: ${formatMoney(item.revenue)}`}
+                  />
+
+                  <div
+                    className="w-6 rounded-t-md bg-[#e96d1b] transition hover:bg-[#d85e12]"
+                    style={{ height: `${barHeight(item.expenses)}%` }}
+                    title={`Затраты: ${formatMoney(item.expenses)}`}
+                  />
+
+                  <span className="absolute translate-y-7 text-[10px] text-[#a09187]">
+                    {item.label}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
