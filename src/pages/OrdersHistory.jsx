@@ -170,14 +170,19 @@ function OrdersHistory() {
           );
         }
 
-        const normalizedOrders = data.map(normalizeOrder);
+        const normalizedOrders = data
+          .map(normalizeOrder)
+          .sort(
+            (firstOrder, secondOrder) =>
+              new Date(secondOrder.created).getTime() -
+              new Date(firstOrder.created).getTime(),
+          );
 
         if (isMounted) {
           setOrders(normalizedOrders);
         }
       } catch (requestError) {
         if (isMounted) {
-          setOrders([]);
           setError(
             requestError.message ||
               "Не удалось загрузить историю заказов.",
@@ -192,8 +197,11 @@ function OrdersHistory() {
 
     loadOrders();
 
+    const intervalId = setInterval(loadOrders, 5000);
+
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
     };
   }, []);
 
