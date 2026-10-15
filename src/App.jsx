@@ -181,27 +181,6 @@ function App() {
         />
 
         <div className="min-w-0 flex-1">
-          <header className="flex flex-col gap-2 border-b border-[#eee4dc] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <div>
-              <div className="text-xs text-[#97877c]">Текущий пользователь</div>
-              <div className="text-sm font-semibold">{currentUser.name}</div>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-[#776960]">Переключить для проверки:</span>
-              <select
-                  value={currentUser.id}
-                  onChange={handleActiveUserChange}
-                  className="max-w-full rounded-lg border border-[#e4d8cf] bg-white px-3 py-2 text-sm"
-              >
-                {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} — {ROLE_LABELS[user.role]}
-                    </option>
-                ))}
-              </select>
-            </label>
-          </header>
 
           <main>{renderPage()}</main>
         </div>
