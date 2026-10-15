@@ -15,6 +15,22 @@ const MONTHS_SHORT = [
   "дек.",
 ];
 
+const UNIT_LABELS = {
+  Item: "шт.",
+  Kilogram: "кг",
+  Liter: "л",
+  item: "шт.",
+  kilogram: "кг",
+  liter: "л",
+};
+
+function formatAmount(value, unit) {
+  const amount = Number(value) || 0;
+  const label = UNIT_LABELS[unit] ?? unit ?? "";
+
+  return label ? `${amount} ${label}` : `${amount}`;
+}
+
 async function apiRequest(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -45,37 +61,76 @@ function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 }
 
+function pluralizePosition(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return "позиция";
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return "позиции";
+  }
+
+  return "позиций";
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("ru-RU");
+}
+
+function formatDaysUntil(days) {
+  const value = Number(days);
+
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  if (value < 0) {
+    return "Просрочено";
+  }
+
+  if (value === 0) {
+    return "Сегодня";
+  }
+
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${value} день`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} дня`;
+  }
+
+  return `${value} дней`;
+}
+
 const statistics = [
   {
-    title: "Всего продуктов",
-    value: "124",
-    description: "позиций в ассортименте",
-    icon: "▤",
-    iconClass: "bg-[#fff0df] text-[#d9671b]",
-  },
-  {
-    title: "Активных партий",
-    value: "48",
-    description: "партий на складе",
-    icon: "▣",
-    iconClass: "bg-[#fff4d8] text-[#c8881b]",
-  },
-  {
-    title: "Критический остаток",
-    value: "7",
-    description: "требуют пополнения",
-    icon: "!",
-    iconClass: "bg-[#ffe1dd] text-[#c84d45]",
-  },
-  {
     title: "Списано за месяц",
-    values: [
-      { value: "36 кг", label: "килограммы" },
-      { value: "18 л", label: "литры" },
-      { value: "42 шт.", label: "штуки" },
-    ],
+    decommis: true,
     icon: "↘",
     iconClass: "bg-[#ffe1dd] text-[#c84d45]",
+  },
+  {
+    title: "Популярные блюда",
+    topDishes: true,
+    icon: "★",
+    iconClass: "bg-[#fff4d8] text-[#c8881b]",
   },
   {
     title: "Финансы за месяц",
@@ -99,14 +154,14 @@ const statistics = [
 const attentionItems = [
   {
     title: "Просроченные продукты",
-    value: "3 позиции",
+    countKey: "expired",
     description: "требуют списания",
     icon: "!",
     iconClass: "bg-[#ffe1dd] text-[#c84d45]",
   },
   {
     title: "Заканчиваются скоро",
-    value: "12 позиций",
+    countKey: "expiring",
     description: "срок истекает через 1–3 дня",
     icon: "◷",
     iconClass: "bg-[#fff0c9] text-[#b8791b]",
@@ -114,6 +169,10 @@ const attentionItems = [
 ];
 
 const statusConfig = {
+  Active: {
+    label: "Активно",
+    className: "bg-[#e6f1e1] text-[#5b8747]",
+  },
   Expiring: {
     label: "Скоро истекает",
     className: "bg-[#fff0c9] text-[#b8791b]",
@@ -124,41 +183,41 @@ const statusConfig = {
   },
 };
 
-const expirationProducts = [
-  {
-    product: "Куриное филе",
-    batch: "П-1038",
-    expiration: "14.10.2026",
-    remaining: "1 день",
-    status: "Expiring",
-  },
-  {
-    product: "Томаты",
-    batch: "П-1039",
-    expiration: "15.10.2026",
-    remaining: "2 дня",
-    status: "Expiring",
-  },
-  {
-    product: "Сливки 20%",
-    batch: "П-1037",
-    expiration: "16.10.2026",
-    remaining: "3 дня",
-    status: "Expiring",
-  },
-  {
-    product: "Моцарелла",
-    batch: "П-1031",
-    expiration: "12.10.2026",
-    remaining: "Просрочено",
-    status: "Expired",
-  },
-];
+function formatToday() {
+  const today = new Date();
+  const weekday = today.toLocaleDateString("ru-RU", { weekday: "long" });
+  const dayMonth = today.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+  });
+
+  const capitalized =
+    weekday.charAt(0).toUpperCase() + weekday.slice(1);
+
+  return `${capitalized}, ${dayMonth} ${today.getFullYear()}`;
+}
 
 function Dashboard() {
   const [financeData, setFinanceData] = useState([]);
   const [financesLoading, setFinancesLoading] = useState(true);
   const [financesError, setFinancesError] = useState("");
+  const [decommisTotal, setDecommisTotal] = useState(null);
+  const [decommisLoading, setDecommisLoading] = useState(true);
+  const [topDishes, setTopDishes] = useState([]);
+  const [topDishesLoading, setTopDishesLoading] = useState(true);
+  const [expiredCount, setExpiredCount] = useState(null);
+  const [expiringCount, setExpiringCount] = useState(null);
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [recoItems, setRecoItems] = useState([]);
+  const [recoLoading, setRecoLoading] = useState(true);
+  const [recoError, setRecoError] = useState("");
+  const [stoplistItems, setStoplistItems] = useState([]);
+  const [stoplistLoading, setStoplistLoading] = useState(true);
+  const [stoplistError, setStoplistError] = useState("");
+  const [expiredSoon, setExpiredSoon] = useState([]);
+  const [expiredSoonLoading, setExpiredSoonLoading] = useState(true);
+  const [expiredSoonError, setExpiredSoonError] = useState("");
+  const todayLabel = formatToday();
 
   useEffect(() => {
     let isActive = true;
@@ -196,6 +255,214 @@ function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadDecommis() {
+      try {
+        const data = await apiRequest("/api/v1/dashboard/DecommisStock");
+
+        if (isActive) {
+          setDecommisTotal(Number(data?.totalAmount) || 0);
+        }
+      } catch {
+        if (isActive) {
+          setDecommisTotal(null);
+        }
+      } finally {
+        if (isActive) {
+          setDecommisLoading(false);
+        }
+      }
+    }
+
+    loadDecommis();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadTopDishes() {
+      try {
+        const data = await apiRequest("/api/v1/dashboard/TopDishes");
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isActive) {
+          setTopDishes(list.slice(0, 3));
+        }
+      } catch {
+        if (isActive) {
+          setTopDishes([]);
+        }
+      } finally {
+        if (isActive) {
+          setTopDishesLoading(false);
+        }
+      }
+    }
+
+    loadTopDishes();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadAttentionCounts() {
+      try {
+        const [expired, expiring] = await Promise.all([
+          apiRequest("/api/v1/dashboard/GetExpiredCount"),
+          apiRequest("/api/v1/dashboard/GetExpiredSoonCount"),
+        ]);
+
+        if (isActive) {
+          setExpiredCount(Number(expired) || 0);
+          setExpiringCount(Number(expiring) || 0);
+        }
+      } catch {
+        if (isActive) {
+          setExpiredCount(null);
+          setExpiringCount(null);
+        }
+      } finally {
+        if (isActive) {
+          setCountsLoading(false);
+        }
+      }
+    }
+
+    loadAttentionCounts();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadDeliveryRecommendations() {
+      try {
+        const data = await apiRequest(
+          "/api/v1/dashboard/forecast/deliveryRecomend",
+        );
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isActive) {
+          setRecoItems(list);
+          setRecoError("");
+        }
+      } catch {
+        if (isActive) {
+          setRecoError("Не удалось загрузить рекомендации по поставкам.");
+        }
+      } finally {
+        if (isActive) {
+          setRecoLoading(false);
+        }
+      }
+    }
+
+    loadDeliveryRecommendations();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadStoplist() {
+      try {
+        const data = await apiRequest("/api/v1/dashboard/forecast/stoplist");
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isActive) {
+          setStoplistItems(list);
+          setStoplistError("");
+        }
+      } catch {
+        if (isActive) {
+          setStoplistError("Не удалось загрузить данные по стоп-листу.");
+        }
+      } finally {
+        if (isActive) {
+          setStoplistLoading(false);
+        }
+      }
+    }
+
+    loadStoplist();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadExpiredSoon() {
+      try {
+        const data = await apiRequest("/api/v1/Stock/getExpiredSoon");
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        if (isActive) {
+          setExpiredSoon(list);
+          setExpiredSoonError("");
+        }
+      } catch {
+        if (isActive) {
+          setExpiredSoonError(
+            "Не удалось загрузить данные по срокам годности.",
+          );
+        }
+      } finally {
+        if (isActive) {
+          setExpiredSoonLoading(false);
+        }
+      }
+    }
+
+    loadExpiredSoon();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const financePoints = financeData.map((item) => ({
     key: `${item.year}-${item.month}`,
     label: `${MONTHS_SHORT[item.month - 1] ?? item.month} ${String(
@@ -222,25 +489,65 @@ function Dashboard() {
     return itemOrder > latestOrder ? item : latest;
   }, null);
 
-  const displayedStatistics = statistics.map((statistic) =>
-    statistic.finance
-      ? {
-          ...statistic,
-          finance: [
-            {
-              title: "Общая выручка",
-              value: latestFinance ? formatMoney(latestFinance.income) : "—",
-              valueClass: "text-[#659251]",
-            },
-            {
-              title: "Общие затраты",
-              value: latestFinance ? formatMoney(latestFinance.expense) : "—",
-              valueClass: "text-[#c84d45]",
-            },
-          ],
-        }
-      : statistic,
-  );
+  const displayedStatistics = statistics.map((statistic) => {
+    if (statistic.finance) {
+      return {
+        ...statistic,
+        finance: [
+          {
+            title: "Общая выручка",
+            value: latestFinance ? formatMoney(latestFinance.income) : "—",
+            valueClass: "text-[#659251]",
+          },
+          {
+            title: "Общие затраты",
+            value: latestFinance ? formatMoney(latestFinance.expense) : "—",
+            valueClass: "text-[#c84d45]",
+          },
+        ],
+      };
+    }
+
+    if (statistic.decommis) {
+      return {
+        ...statistic,
+        value: decommisLoading
+          ? "…"
+          : decommisTotal === null
+            ? "—"
+            : formatMoney(decommisTotal),
+        description: "списано за месяц",
+      };
+    }
+
+    if (statistic.topDishes) {
+      return {
+        ...statistic,
+        values: topDishes.map((dish) => ({
+          value: dish?.soldCount ?? 0,
+          label: dish?.dishName ?? "—",
+        })),
+        emptyText: topDishesLoading
+          ? "Загрузка..."
+          : "Нет данных",
+      };
+    }
+
+    return statistic;
+  });
+
+  const displayedAttentionItems = attentionItems.map((item) => {
+    const count = item.countKey === "expired" ? expiredCount : expiringCount;
+
+    return {
+      ...item,
+      value: countsLoading
+        ? "…"
+        : count === null
+          ? "—"
+          : `${count} ${pluralizePosition(count)}`,
+    };
+  });
 
   function barHeight(value) {
     if (!financeMax || value <= 0) {
@@ -265,7 +572,7 @@ function Dashboard() {
           </div>
 
           <div className="pb-1 text-[13px] text-[#ad9b90]">
-            Вторник, 13 октября 2026
+            {todayLabel}
           </div>
         </header>
 
@@ -313,20 +620,29 @@ function Dashboard() {
                   </div>
                 ) : statistic.values ? (
                   <div className="divide-y divide-[#f1e8e1]">
-                    {statistic.values.map((item) => (
-                      <div
-                        key={item.label}
-                        className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
-                      >
-                        <span className="text-[22px] font-extrabold tracking-[-0.05em] text-[#3a322d]">
-                          {item.value}
-                        </span>
-
-                        <span className="text-[11px] text-[#a39389]">
-                          {item.label}
-                        </span>
+                    {statistic.values.length === 0 ? (
+                      <div className="py-2 text-[12px] text-[#a39389]">
+                        {statistic.emptyText ?? "Нет данных"}
                       </div>
-                    ))}
+                    ) : (
+                      statistic.values.map((item) => (
+                        <div
+                          key={item.label}
+                          className="flex items-center justify-between gap-3 py-1 first:pt-0 last:pb-0"
+                        >
+                          <span className="truncate text-[11px] font-bold text-[#5d5049]">
+                            {item.label}
+                          </span>
+
+                          <span className="shrink-0 whitespace-nowrap text-[13px] font-extrabold tracking-[-0.03em] text-[#3a322d]">
+                            {item.value}{" "}
+                            <span className="font-bold text-[#a39389]">
+                              продано ед.
+                            </span>
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 ) : (
                   <>
@@ -369,44 +685,175 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="flex h-[260px] items-end gap-5 border-b border-l border-[#eaded5] px-5 pb-0 pt-5">
-            {financesLoading ? (
-              <div className="w-full pb-24 text-center text-[13px] text-[#a09187]">
-                Загрузка данных...
-              </div>
-            ) : financesError ? (
-              <div className="w-full pb-24 text-center text-[13px] text-[#c84d45]">
-                {financesError}
-              </div>
-            ) : financePoints.length === 0 ? (
-              <div className="w-full pb-24 text-center text-[13px] text-[#a09187]">
-                Нет данных за выбранный период.
-              </div>
-            ) : (
-              financePoints.map((item) => (
-                <div
-                  key={item.key}
-                  className="relative flex h-full flex-1 items-end justify-center gap-2"
-                >
-                  <div
-                    className="w-6 rounded-t-md bg-[#82b274] transition hover:bg-[#6d9f60]"
-                    style={{ height: `${barHeight(item.revenue)}%` }}
-                    title={`Выручка: ${formatMoney(item.revenue)}`}
-                  />
-
-                  <div
-                    className="w-6 rounded-t-md bg-[#e96d1b] transition hover:bg-[#d85e12]"
-                    style={{ height: `${barHeight(item.expenses)}%` }}
-                    title={`Затраты: ${formatMoney(item.expenses)}`}
-                  />
-
-                  <span className="absolute translate-y-7 text-[10px] text-[#a09187]">
-                    {item.label}
-                  </span>
+          <div className="pt-5">
+            <div className="flex h-[240px] items-end gap-5 border-b border-l border-[#eaded5] px-5">
+              {financesLoading ? (
+                <div className="w-full self-center pb-24 text-center text-[13px] text-[#a09187]">
+                  Загрузка данных...
                 </div>
-              ))
-            )}
+              ) : financesError ? (
+                <div className="w-full self-center pb-24 text-center text-[13px] text-[#c84d45]">
+                  {financesError}
+                </div>
+              ) : financePoints.length === 0 ? (
+                <div className="w-full self-center pb-24 text-center text-[13px] text-[#a09187]">
+                  Нет данных за выбранный период.
+                </div>
+              ) : (
+                financePoints.map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex h-full flex-1 items-end justify-center gap-2"
+                  >
+                    <div
+                      className="w-6 rounded-t-md bg-[#82b274] transition hover:bg-[#6d9f60]"
+                      style={{ height: `${barHeight(item.revenue)}%` }}
+                      title={`Выручка: ${formatMoney(item.revenue)}`}
+                    />
+
+                    <div
+                      className="w-6 rounded-t-md bg-[#e96d1b] transition hover:bg-[#d85e12]"
+                      style={{ height: `${barHeight(item.expenses)}%` }}
+                      title={`Затраты: ${formatMoney(item.expenses)}`}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            {!financesLoading &&
+              !financesError &&
+              financePoints.length > 0 && (
+                <div className="flex gap-5 px-5 pt-2">
+                  {financePoints.map((item) => (
+                    <span
+                      key={item.key}
+                      className="flex-1 text-center text-[10px] text-[#a09187]"
+                    >
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              )}
           </div>
+        </section>
+
+        <section className="mb-8 overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
+          <div className="border-b border-[#f3e8e0] px-6 py-5">
+            <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+              Рекомендации по поставкам
+            </h3>
+
+            <p className="mt-1 text-[13px] text-[#a09187]">
+              Продукты, которые стоит закупить для пополнения запасов
+            </p>
+          </div>
+
+          <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-3 bg-[#fffaf7] px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+            <div>Продукт</div>
+            <div>Требуется</div>
+            <div>Доступно</div>
+            <div>К закупке</div>
+          </div>
+
+          {recoLoading ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Загрузка данных...
+            </div>
+          ) : recoError ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#c84d45]">
+              {recoError}
+            </div>
+          ) : recoItems.length === 0 ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Нет данных по рекомендациям.
+            </div>
+          ) : (
+            recoItems.map((item, index) => (
+              <div
+                key={`${item.productName}-${index}`}
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
+              >
+                <div className="font-bold text-[#493e38]">
+                  {item.productName || "—"}
+                </div>
+
+                <div className="text-[#85766d]">
+                  {formatAmount(item.requiredAmount, item.unit)}
+                </div>
+
+                <div className="text-[#85766d]">
+                  {formatAmount(item.availableAmount, item.unit)}
+                </div>
+
+                <div className="font-extrabold text-[#d9671b]">
+                  {formatAmount(item.toBuyAmount, item.unit)}
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+
+        <section className="mb-8 overflow-hidden rounded-[20px] border border-[#f0e2d8] bg-white shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
+          <div className="border-b border-[#f3e8e0] px-6 py-5">
+            <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+              Блюда в стоп-листе
+            </h3>
+
+            <p className="mt-1 text-[13px] text-[#a09187]">
+              Блюда, которые могут попасть в стоп-лист в ближайшее время
+            </p>
+          </div>
+
+          <div className="grid grid-cols-[2fr_1fr_1fr] gap-3 bg-[#fffaf7] px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+            <div>Блюдо</div>
+            <div>Можно приготовить</div>
+            <div>Статус</div>
+          </div>
+
+          {stoplistLoading ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Загрузка данных...
+            </div>
+          ) : stoplistError ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#c84d45]">
+              {stoplistError}
+            </div>
+          ) : stoplistItems.length === 0 ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Нет данных по стоп-листу.
+            </div>
+          ) : (
+            stoplistItems.map((item, index) => {
+              const canPrepare = Number(item.countCanPrepare) || 0;
+              const inStoplist = canPrepare === 0;
+
+              return (
+                <div
+                  key={`${item.dishName}-${index}`}
+                  className="grid grid-cols-[2fr_1fr_1fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
+                >
+                  <div className="font-bold text-[#493e38]">
+                    {item.dishName || "—"}
+                  </div>
+
+                  <div className="text-[#85766d]">{canPrepare}</div>
+
+                  <div>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                        inStoplist
+                          ? "bg-[#ffe1dd] text-[#c84d45]"
+                          : "bg-[#fff0c9] text-[#b8791b]"
+                      }`}
+                    >
+                      {inStoplist ? "В стоп-листе" : "Риск"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </section>
 
         <section className="mb-8">
@@ -421,7 +868,7 @@ function Dashboard() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {attentionItems.map((item) => (
+            {displayedAttentionItems.map((item) => (
               <article
                 key={item.title}
                 className="flex items-center justify-between rounded-[18px] border border-[#f0e2d8] bg-white p-5"
@@ -463,45 +910,61 @@ function Dashboard() {
 
           <div className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] gap-3 bg-[#fffaf7] px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
             <div>Продукт</div>
-            <div>Партия</div>
+            <div>Количество</div>
             <div>Срок годности</div>
             <div>Осталось</div>
             <div>Статус</div>
           </div>
 
-          {expirationProducts.map((product) => {
-            const status = statusConfig[product.status] || {
-              label: "Неизвестный статус",
-              className: "bg-[#eee9e5] text-[#81766e]",
-            };
+          {expiredSoonLoading ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Загрузка данных...
+            </div>
+          ) : expiredSoonError ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#c84d45]">
+              {expiredSoonError}
+            </div>
+          ) : expiredSoon.length === 0 ? (
+            <div className="px-6 py-6 text-center text-[13px] text-[#a09187]">
+              Нет данных.
+            </div>
+          ) : (
+            expiredSoon.map((item, index) => {
+              const status = statusConfig[item.status] || {
+                label: item.status || "Неизвестный статус",
+                className: "bg-[#eee9e5] text-[#81766e]",
+              };
 
-            return (
-              <div
-                key={product.product}
-                className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
-              >
-                <div className="font-bold text-[#493e38]">
-                  {product.product}
+              return (
+                <div
+                  key={`${item.productType}-${index}`}
+                  className="grid grid-cols-[1.5fr_0.8fr_1fr_0.8fr_0.9fr] items-center gap-3 border-t border-[#f4ebe5] px-6 py-4 text-[12px]"
+                >
+                  <div className="font-bold text-[#493e38]">
+                    {item.productType || "—"}
+                  </div>
+
+                  <div className="text-[#85766d]">{item.amount ?? 0}</div>
+
+                  <div className="text-[#85766d]">
+                    {formatDate(item.dateExpired)}
+                  </div>
+
+                  <div className="font-bold text-[#665850]">
+                    {formatDaysUntil(item.daysUntilExpiration)}
+                  </div>
+
+                  <div>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
                 </div>
-
-                <div className="text-[#85766d]">{product.batch}</div>
-
-                <div className="text-[#85766d]">{product.expiration}</div>
-
-                <div className="font-bold text-[#665850]">
-                  {product.remaining}
-                </div>
-
-                <div>
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}
-                  >
-                    {status.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </section>
       </div>
     </main>
