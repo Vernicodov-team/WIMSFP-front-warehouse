@@ -1,45 +1,190 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ROLE_LABELS } from "../config/permissions";
 
-function createUserId(users) {
-    const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5094")
+    .replace(/\/+$/, "");
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        let code = "";
+function getArrayFromResponse(result, keys = []) {
+    if (Array.isArray(result)) return result;
+    if (!result || typeof result !== "object") return [];
 
-        if (globalThis.crypto?.getRandomValues) {
-            const randomBytes = new Uint8Array(6);
-            globalThis.crypto.getRandomValues(randomBytes);
+    for (const key of keys) {
+        if (Array.isArray(result[key])) return result[key];
+    }
 
-            code = Array.from(randomBytes, (byte) => alphabet[byte & 31]).join("");
-        } else {
-            code = Array.from(
-                { length: 6 },
-                () => alphabet[Math.floor(Math.random() * alphabet.length)]
-            ).join("");
-        }
-
-        const id = `USR-${code}`;
-
-        if (!users.some((user) => user.id === id)) {
-            return id;
+    if (result.data && typeof result.data === "object") {
+        for (const key of keys) {
+            if (Array.isArray(result.data[key])) return result.data[key];
         }
     }
 
-    return `USR-${Date.now().toString(36).toUpperCase()}`;
+    return [];
 }
 
-function UsersManagement({
-                             users,
-                             onUsersChange,
-                             currentUserId,
-                         }) {
-    const [name, setName] = useState("");
-    const [role, setRole] = useState("waiter");
-    const [error, setError] = useState("");
+function normalizeRole(role) {
+    const value = Array.isArray(role) ? role[0] : role;
+    return typeof value === "string" ? value.trim() : "";
+}
 
-    function addUser(event) {
+function roleLabel(role) {
+    if (!role) return "Не указана";
+
+    const normalizedRole = role.toLowerCase();
+
+    const key = Object.keys(ROLE_LABELS).find(
+        (roleKey) =>
+            roleKey.toLowerCase() === normalizedRole ||
+            String(ROLE_LABELS[roleKey]).trim().toLowerCase() === normalizedRole
+    );
+
+    return key ? ROLE_LABELS[key] : role;
+}
+
+async function readResponse(response) {
+    const text = await response.text();
+
+    if (!text) return null;
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return text;
+    }
+}
+
+function getErrorMessage(result, fallback) {
+    if (typeof result === "string" && result.trim()) return result;
+    return result?.message || result?.title || fallback;
+}
+
+function normalizeUser(user, index) {
+    return {
+        id: String(
+            user.id ??
+            user.userId ??
+            user.userID ??
+            user._id ??
+            `user-${index + 1}`
+        ),
+        name: String(user.name ?? user.username ?? "Без имени"),
+        role: normalizeRole(user.role ?? user.roles),
+    };
+}
+
+function normalizeRoleOption(role) {
+    if (typeof role === "string") {
+        return role.trim();
+    }
+
+    if (role && typeof role === "object") {
+        return String(role.name ?? role.role ?? role.value ?? "").trim();
+    }
+
+    return "";
+}
+
+function UsersManagement({ authToken, currentUserName }) {
+    const [users, setUsers] = useState([]);
+    const [roles, setRoles] = useState([]);
+    const [name, setName] = useState("");
+    const [password, setPassword] = useState("");
+    const [role, setRole] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [deletingUserName, setDeletingUserName] = useState("");
+
+    const authHeaders = authToken
+        ? { Authorization: `Bearer ${authToken}` }
+        : {};
+
+    const loadUsers = useCallback(async () => {
+        setIsLoading(true);
+        setError("");
+
+        try {
+            const response = await fetch(`${API_URL}/api/v1/user/getUsers`, {
+                headers: authToken
+                    ? { Authorization: `Bearer ${authToken}` }
+                    : {},
+            });
+
+            const result = await readResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    getErrorMessage(result, "Не удалось загрузить пользователей.")
+                );
+            }
+
+            const serverUsers = getArrayFromResponse(result, [
+                "users",
+                "items",
+                "data",
+            ]).map(normalizeUser);
+
+            setUsers(serverUsers);
+        } catch (err) {
+            setError(
+                err.message ||
+                "Не удалось загрузить пользователей. Проверь адрес API и настройки CORS."
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    }, [authToken]);
+
+    const loadRoles = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/v1/user/getRoles`, {
+                headers: authToken
+                    ? { Authorization: `Bearer ${authToken}` }
+                    : {},
+            });
+
+            const result = await readResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    getErrorMessage(result, "Не удалось загрузить роли.")
+                );
+            }
+
+            const serverRoles = getArrayFromResponse(result, [
+                "roles",
+                "items",
+                "data",
+            ])
+                .map(normalizeRoleOption)
+                .filter(Boolean);
+
+            if (serverRoles.length > 0) {
+                setRoles(serverRoles);
+
+                setRole((currentRole) =>
+                    serverRoles.includes(currentRole)
+                        ? currentRole
+                        : serverRoles.find((item) => item.toLowerCase() === "waiter") ??
+                        serverRoles[0]
+                );
+            } else {
+                setRoles([]);
+            }
+        } catch (err) {
+            setError((currentError) =>
+                currentError || err.message || "Не удалось загрузить роли."
+            );
+        }
+    }, [authToken]);
+
+    useEffect(() => {
+        loadUsers();
+        loadRoles();
+    }, [loadUsers, loadRoles]);
+
+    async function addUser(event) {
         event.preventDefault();
+        setError("");
 
         const trimmedName = name.trim();
 
@@ -48,56 +193,91 @@ function UsersManagement({
             return;
         }
 
-        const newUser = {
-            id: createUserId(users),
-            name: trimmedName,
-            role,
-        };
-
-        onUsersChange([...users, newUser]);
-        setName("");
-        setRole("waiter");
-        setError("");
-    }
-
-    function changeRole(userId, newRole) {
-        const targetUser = users.find((user) => user.id === userId);
-
-        if (
-            targetUser?.role === "admin" &&
-            newRole !== "admin" &&
-            users.filter((user) => user.role === "admin").length <= 1
-        ) {
-            setError("В системе должен оставаться хотя бы один администратор.");
+        if (!password) {
+            setError("Введите пароль для нового пользователя.");
             return;
         }
 
-        onUsersChange(
-            users.map((user) =>
-                user.id === userId ? { ...user, role: newRole } : user
-            )
+        if (!role) {
+            setError("Не удалось получить список ролей.");
+            return;
+        }
+
+        setIsSaving(true);
+
+        try {
+            const response = await fetch(`${API_URL}/api/v1/user/createUser`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...authHeaders,
+                },
+                body: JSON.stringify({
+                    name: trimmedName,
+                    password,
+                    role,
+                }),
+            });
+
+            const result = await readResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    getErrorMessage(result, "Не удалось создать пользователя.")
+                );
+            }
+
+            setName("");
+            setPassword("");
+            await loadUsers();
+        } catch (err) {
+            setError(err.message || "Не удалось создать пользователя.");
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+    async function removeUser(user) {
+        if (
+            currentUserName &&
+            user.name.trim().toLowerCase() === currentUserName.trim().toLowerCase()
+        ) {
+            setError("Нельзя удалить пользователя, под которым выполнен вход.");
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Удалить пользователя «${user.name}»?`
         );
+
+        if (!confirmed) return;
+
         setError("");
-    }
+        setDeletingUserName(user.name);
 
-    function removeUser(userId) {
-        if (userId === currentUserId) {
-            setError("Нельзя удалить текущего пользователя.");
-            return;
+        try {
+            const response = await fetch(
+                `${API_URL}/api/v1/user/deleteUser/${encodeURIComponent(user.name)}`,
+                {
+                    method: "DELETE",
+                    headers: authHeaders,
+                }
+            );
+
+            const result = await readResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    getErrorMessage(result, "Не удалось удалить пользователя.")
+                );
+            }
+
+            await loadUsers();
+        } catch (err) {
+            setError(err.message || "Не удалось удалить пользователя.");
+        } finally {
+            setDeletingUserName("");
         }
-
-        const targetUser = users.find((user) => user.id === userId);
-
-        if (
-            targetUser?.role === "admin" &&
-            users.filter((user) => user.role === "admin").length <= 1
-        ) {
-            setError("Нельзя удалить последнего администратора.");
-            return;
-        }
-
-        onUsersChange(users.filter((user) => user.id !== userId));
-        setError("");
     }
 
     return (
@@ -107,14 +287,14 @@ function UsersManagement({
                     Панель управления пользователями
                 </h1>
                 <p className="mt-2 text-sm text-[#88796f]">
-                    Добавляйте пользователей и назначайте им роли, определяющие доступные
-                    разделы.
+                    Пользователи и роли загружаются с сервера. Для нового пользователя
+                    задайте имя, пароль и роль.
                 </p>
             </header>
 
             <form
                 onSubmit={addUser}
-                className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#eee4dc] bg-white p-4 sm:flex-row"
+                className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#eee4dc] bg-white p-4 sm:flex-row sm:items-end"
             >
                 <label className="flex-1">
           <span className="mb-1 block text-sm font-medium text-[#62534a]">
@@ -124,6 +304,23 @@ function UsersManagement({
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         placeholder="Например, Анна Иванова"
+                        autoComplete="off"
+                        required
+                        className="w-full rounded-lg border border-[#e4d8cf] px-3 py-2 text-sm outline-none focus:border-[#d9671b]"
+                    />
+                </label>
+
+                <label className="flex-1">
+          <span className="mb-1 block text-sm font-medium text-[#62534a]">
+            Пароль
+          </span>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Задайте пароль"
+                        autoComplete="new-password"
+                        required
                         className="w-full rounded-lg border border-[#e4d8cf] px-3 py-2 text-sm outline-none focus:border-[#d9671b]"
                     />
                 </label>
@@ -135,24 +332,28 @@ function UsersManagement({
                     <select
                         value={role}
                         onChange={(event) => setRole(event.target.value)}
-                        className="w-full rounded-lg border border-[#e4d8cf] bg-white px-3 py-2 text-sm outline-none focus:border-[#d9671b]"
+                        disabled={roles.length === 0}
+                        className="w-full rounded-lg border border-[#e4d8cf] bg-white px-3 py-2 text-sm outline-none focus:border-[#d9671b] disabled:opacity-60"
                     >
-                        {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                                {label}
-                            </option>
-                        ))}
+                        {roles.length === 0 ? (
+                            <option value="">Роли не загружены</option>
+                        ) : (
+                            roles.map((serverRole) => (
+                                <option key={serverRole} value={serverRole}>
+                                    {roleLabel(serverRole)}
+                                </option>
+                            ))
+                        )}
                     </select>
                 </label>
 
-                <div className="flex items-end">
-                    <button
-                        type="submit"
-                        className="min-h-[38px] rounded-lg bg-[#d9671b] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#bd5412]"
-                    >
-                        Добавить
-                    </button>
-                </div>
+                <button
+                    type="submit"
+                    disabled={isSaving || roles.length === 0}
+                    className="min-h-[38px] rounded-lg bg-[#d9671b] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#bd5412] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    {isSaving ? "Добавляем…" : "Добавить"}
+                </button>
             </form>
 
             {error && (
@@ -176,57 +377,75 @@ function UsersManagement({
                     </thead>
 
                     <tbody>
-                    {users.length === 0 ? (
+                    {isLoading ? (
+                        <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-[#88796f]">
+                                Загружаем пользователей…
+                            </td>
+                        </tr>
+                    ) : users.length === 0 ? (
                         <tr>
                             <td colSpan={4} className="px-4 py-8 text-center text-[#88796f]">
                                 Пользователей пока нет.
                             </td>
                         </tr>
                     ) : (
-                        users.map((user) => (
-                            <tr key={user.id} className="border-t border-[#f0e8e2]">
-                                <td className="max-w-56 break-all px-4 py-3 font-mono text-xs text-[#776960]">
-                                    {user.id}
-                                </td>
-                                <td className="px-4 py-3 font-medium text-[#45372f]">
-                                    {user.name}
-                                    {user.id === currentUserId && (
-                                        <span className="ml-2 text-xs text-[#a09288]">
-                        (текущий)
-                      </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <select
-                                        aria-label={`Роль пользователя ${user.name}`}
-                                        value={user.role}
-                                        onChange={(event) =>
-                                            changeRole(user.id, event.target.value)
-                                        }
-                                        className="rounded-lg border border-[#e4d8cf] bg-white px-3 py-2 text-sm"
-                                    >
-                                        {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                                            <option key={value} value={value}>
-                                                {label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => removeUser(user.id)}
-                                        disabled={user.id === currentUserId}
-                                        className="rounded-lg px-3 py-2 text-sm font-medium text-[#bd4138] hover:bg-[#fff1ef] disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        Удалить
-                                    </button>
-                                </td>
-                            </tr>
-                        ))
+                        users.map((user) => {
+                            const isCurrentUser =
+                                currentUserName &&
+                                user.name.trim().toLowerCase() ===
+                                currentUserName.trim().toLowerCase();
+
+                            return (
+                                <tr key={user.id} className="border-t border-[#f0e8e2]">
+                                    <td className="max-w-56 break-all px-4 py-3 font-mono text-xs text-[#776960]">
+                                        {user.id}
+                                    </td>
+
+                                    <td className="px-4 py-3 font-medium text-[#45372f]">
+                                        {user.name}
+                                        {isCurrentUser && (
+                                            <span className="ml-2 text-xs text-[#a09288]">
+                          (текущий)
+                        </span>
+                                        )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-[#776960]">
+                                        {(ROLE_LABELS[user.role] ?? roleLabel(user.role)) ||
+                                            "Не указана"}
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeUser(user)}
+                                            disabled={Boolean(isCurrentUser) || deletingUserName === user.name}
+                                            className="rounded-lg px-3 py-2 text-sm font-medium text-[#bd4138] hover:bg-[#fff1ef] disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            {deletingUserName === user.name
+                                                ? "Удаляем…"
+                                                : "Удалить"}
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })
                     )}
                     </tbody>
                 </table>
+
+                {!isLoading && (
+                    <div className="border-t border-[#f0e8e2] p-3 text-right">
+                        <button
+                            type="button"
+                            onClick={loadUsers}
+                            className="rounded-lg px-3 py-2 text-sm font-medium text-[#8b4b2b] hover:bg-[#fff1e7]"
+                        >
+                            Обновить список
+                        </button>
+                    </div>
+                )}
             </div>
         </section>
     );

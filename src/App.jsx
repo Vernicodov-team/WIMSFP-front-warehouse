@@ -200,9 +200,8 @@ function App() {
 
         return (
             <UsersManagement
-                users={users}
-                onUsersChange={setUsers}
-                currentUserId={currentUser.id}
+                authToken={authToken}
+                currentUserName={authenticatedUser?.name}
             />
         );
 
