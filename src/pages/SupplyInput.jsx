@@ -1,49 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const products = [
-  {
-    id: 1,
-    name: "Яйца",
-    unit: "Item",
-  },
-  {
-    id: 2,
-    name: "Мясо",
-    unit: "Kilogram",
-  },
-  {
-    id: 3,
-    name: "Молоко",
-    unit: "Liter",
-  },
-  {
-    id: 4,
-    name: "Рис",
-    unit: "Kilogram",
-  },
-  {
-    id: 5,
-    name: "Томаты",
-    unit: "Kilogram",
-  },
-  {
-    id: 6,
-    name: "Оливковое масло",
-    unit: "Liter",
-  },
-];
-
-const suppliers = [
-  "ООО «ФудПоставка»",
-  "ООО «Свежий продукт»",
-  "ИП «Овощной мир»",
-  "ООО «Молочный край»",
-];
+const API_URL = "http://localhost:5094/api/v1";
 
 const unitLabels = {
-  Item: "шт.",
-  Kilogram: "кг",
-  Liter: "л",
+  item: "шт.",
+  kilogram: "кг",
+  liter: "л",
 };
 
 function MinusIcon() {
@@ -67,21 +29,99 @@ function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 }
 
+function normalizeUnit(unit) {
+  return String(unit || "").trim().toLowerCase();
+}
+
+function getUnitLabel(unit) {
+  return unitLabels[normalizeUnit(unit)] || unit || "—";
+}
+
+function toIsoDate(date) {
+  return new Date(`${date}T00:00:00`).toISOString();
+}
+
 function SupplyInput({ onAddDelivery }) {
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
+
+  const [productsError, setProductsError] = useState("");
+  const [suppliersError, setSuppliersError] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   const [deliveryNumber, setDeliveryNumber] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [supplier, setSupplier] = useState("");
+  const [supplierName, setSupplierName] = useState("");
 
   const [deliveryProducts, setDeliveryProducts] = useState([
-  {
-    id: 1,
-    productId: "",
-    amount: "",
-    price: "",
-  },
-]);
+    {
+      id: 1,
+      productName: "",
+      amount: "",
+      price: "",
+      expirationDate: "",
+    },
+  ]);
 
-  const [error, setError] = useState("");
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const response = await fetch(`${API_URL}/Products`);
+
+        if (!response.ok) {
+          throw new Error(`Ошибка загрузки продуктов: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Некорректный ответ со списком продуктов.");
+        }
+
+        setProducts(data);
+      } catch (requestError) {
+        setProductsError(
+          requestError.message || "Не удалось загрузить продукты.",
+        );
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }
+
+    loadProducts();
+  }, []);
+
+  useEffect(() => {
+    async function loadSuppliers() {
+      try {
+        const response = await fetch(`${API_URL}/Suppliers`);
+
+        if (!response.ok) {
+          throw new Error(`Ошибка загрузки поставщиков: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Некорректный ответ со списком поставщиков.");
+        }
+
+        setSuppliers(data);
+      } catch (requestError) {
+        setSuppliersError(
+          requestError.message || "Не удалось загрузить поставщиков.",
+        );
+      } finally {
+        setIsLoadingSuppliers(false);
+      }
+    }
+
+    loadSuppliers();
+  }, []);
 
   function addProductRow() {
     setError("");
@@ -90,9 +130,10 @@ function SupplyInput({ onAddDelivery }) {
       ...currentProducts,
       {
         id: Date.now() + Math.random(),
-        productId: "",
+        productName: "",
         amount: "",
         price: "",
+        expirationDate: "",
       },
     ]);
   }
@@ -122,31 +163,32 @@ function SupplyInput({ onAddDelivery }) {
   }
 
   function calculateProductCost(product) {
-    const amount = Number(product.amount) || 0;
-    const price = Number(product.price) || 0;
-
-    return amount * price;
+    return (Number(product.amount) || 0) * (Number(product.price) || 0);
   }
 
   function resetForm() {
     setDeliveryNumber("");
     setDeliveryDate("");
-    setSupplier("");
+    setSupplierName("");
     setError("");
+    setSuccess("");
 
     setDeliveryProducts([
       {
-        id: Date.now(),
-        productId: "",
+        id: 1,
+        productName: "",
         amount: "",
         price: "",
+        expirationDate: "",
       },
     ]);
   }
 
-  function submitSupply(event) {
+  async function submitSupply(event) {
     event.preventDefault();
+
     setError("");
+    setSuccess("");
 
     if (!deliveryNumber.trim()) {
       setError("Введите номер поставки.");
@@ -158,91 +200,119 @@ function SupplyInput({ onAddDelivery }) {
       return;
     }
 
-    if (!supplier) {
+    if (!supplierName) {
       setError("Выберите поставщика.");
       return;
     }
 
-    const emptyProductRow = deliveryProducts.some(
-      (deliveryProduct) => !deliveryProduct.productId,
-    );
-
-    if (emptyProductRow) {
+    if (deliveryProducts.some((product) => !product.productName)) {
       setError("Выберите продукт в каждой строке.");
       return;
     }
 
-    const invalidAmount = deliveryProducts.some(
-      (deliveryProduct) => Number(deliveryProduct.amount) <= 0,
-    );
-
-    if (invalidAmount) {
+    if (
+      deliveryProducts.some(
+        (product) => !product.amount || Number(product.amount) <= 0,
+      )
+    ) {
       setError("Количество должно быть больше нуля.");
       return;
     }
 
-    const emptyPrice = deliveryProducts.some(
-      (deliveryProduct) => deliveryProduct.price === "",
-    );
-
-    if (emptyPrice) {
-      setError("Введите цену для каждого продукта.");
+    if (
+      deliveryProducts.some(
+        (product) => product.price === "" || Number(product.price) < 0,
+      )
+    ) {
+      setError("Введите корректную цену для каждого продукта.");
       return;
     }
 
-    const invalidPrice = deliveryProducts.some(
-      (deliveryProduct) => Number(deliveryProduct.price) < 0,
-    );
-
-    if (invalidPrice) {
-      setError("Цена не может быть отрицательной.");
+    if (deliveryProducts.some((product) => !product.expirationDate)) {
+      setError("Укажите срок годности для каждого продукта.");
       return;
     }
 
-    const preparedProducts = deliveryProducts.map((deliveryProduct) => {
-      const selectedProduct = products.find(
-        (product) => product.id === Number(deliveryProduct.productId),
-      );
-
-      const amount = Number(deliveryProduct.amount);
-      const price = Number(deliveryProduct.price);
-
-      return {
-        name: selectedProduct.name,
-        quantity: amount,
-        unit: unitLabels[selectedProduct.unit],
-        backendUnit: selectedProduct.unit,
-        price,
-        cost: amount * price,
-
-        // Эти даты позже будут приходить от бэкенда.
-        productionDate: null,
-        expirationDate: null,
-      };
-    });
-
-    const totalCost = preparedProducts.reduce(
-      (total, product) => total + product.cost,
+    const totalPrice = deliveryProducts.reduce(
+      (total, product) => total + calculateProductCost(product),
       0,
     );
 
-    const totalWeight = preparedProducts.reduce(
-      (total, product) => total + product.quantity,
-      0,
-    );
-
-    const newDelivery = {
-      id: Date.now(),
+    const payload = {
       number: deliveryNumber.trim(),
-      date: deliveryDate,
-      supplier,
-      totalWeight,
-      cost: totalCost,
-      products: preparedProducts,
+      dateReceived: toIsoDate(deliveryDate),
+      price: totalPrice,
+      supplierName,
+      receivedProducts: deliveryProducts.map((product) => ({
+        productName: product.productName,
+        expirationDate: toIsoDate(product.expirationDate),
+        count: Number(product.amount),
+        itemPrice: Number(product.price),
+      })),
     };
 
-    onAddDelivery(newDelivery);
+    try {
+      const response = await fetch(`${API_URL}/supply/AddDelivery`, {
+        method: "POST",
+        headers: {
+          Accept: "*/*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+
+        throw new Error(
+          responseText ||
+            `Ошибка создания поставки: ${response.status}`,
+        );
+      }
+
+      const newDelivery = {
+        id: Date.now(),
+        number: payload.number,
+        date: deliveryDate,
+        supplier: payload.supplierName,
+        totalWeight: deliveryProducts.reduce(
+          (total, product) => total + Number(product.amount),
+          0,
+        ),
+        cost: totalPrice,
+        products: deliveryProducts.map((product) => ({
+          name: product.productName,
+          quantity: Number(product.amount),
+          unit:
+            getUnitLabel(
+              products.find(
+                (item) => item.name === product.productName,
+              )?.measureUnit,
+            ),
+          price: Number(product.price),
+          cost: calculateProductCost(product),
+          productionDate: null,
+          expirationDate: product.expirationDate,
+        })),
+      };
+
+      if (onAddDelivery) {
+        onAddDelivery(newDelivery);
+      } else {
+        setSuccess("Поставка успешно создана.");
+        resetForm();
+      }
+    } catch (requestError) {
+      setError(
+        requestError.message || "Не удалось создать поставку.",
+      );
+    }
   }
+
+  const totalPrice = deliveryProducts.reduce(
+    (total, product) => total + calculateProductCost(product),
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
@@ -259,12 +329,12 @@ function SupplyInput({ onAddDelivery }) {
 
         <form onSubmit={submitSupply}>
           <section className="mb-6 rounded-[20px] border border-[#f0e2d8] bg-white p-6 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-            <h3 className="mb-5 text-[21px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+            <h3 className="mb-5 text-[21px] font-extrabold text-[#332d29]">
               Данные поставки
             </h3>
 
             <div className="grid grid-cols-3 gap-4">
-              <label className="block">
+              <label>
                 <span className="mb-2 block text-[12px] font-bold text-[#85766d]">
                   Номер поставки
                 </span>
@@ -275,71 +345,92 @@ function SupplyInput({ onAddDelivery }) {
                     setDeliveryNumber(event.target.value)
                   }
                   placeholder="Например, П-1043"
-                  className="h-11 w-full rounded-xl border border-[#eaded5] bg-[#fffdfb] px-3 text-[13px] placeholder:text-[#b5a69d] focus:border-[#eb701c] focus:outline-none"
+                  className="h-11 w-full rounded-xl border border-[#eaded5] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
                 />
               </label>
 
-              <label className="block">
+              <label>
                 <span className="mb-2 block text-[12px] font-bold text-[#85766d]">
-                  Дата поставки
+                  Дата получения
                 </span>
 
                 <input
                   type="date"
                   value={deliveryDate}
                   onChange={(event) => setDeliveryDate(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-[#eaded5] bg-[#fffdfb] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
+                  className="h-11 w-full rounded-xl border border-[#eaded5] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
                 />
               </label>
 
-              <label className="block">
+              <label>
                 <span className="mb-2 block text-[12px] font-bold text-[#85766d]">
                   Поставщик
                 </span>
 
                 <select
-                  value={supplier}
-                  onChange={(event) => setSupplier(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] text-[#665850] focus:border-[#eb701c] focus:outline-none"
+                  value={supplierName}
+                  onChange={(event) => setSupplierName(event.target.value)}
+                  disabled={isLoadingSuppliers || suppliers.length === 0}
+                  className="h-11 w-full rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] focus:border-[#eb701c] focus:outline-none disabled:bg-[#f8f3ef]"
                 >
-                  <option value="">Выберите поставщика</option>
+                  <option value="">
+                    {isLoadingSuppliers
+                      ? "Загрузка поставщиков..."
+                      : "Выберите поставщика"}
+                  </option>
 
-                  {suppliers.map((supplierName) => (
-                    <option key={supplierName} value={supplierName}>
-                      {supplierName}
+                  {suppliers.map((supplier) => (
+                    <option
+                      key={supplier.email}
+                      value={supplier.name}
+                    >
+                      {supplier.name} — {supplier.email}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
+
+            {suppliersError && (
+              <div className="mt-4 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+                {suppliersError}
+              </div>
+            )}
           </section>
 
           <section className="mb-6 rounded-[20px] border border-[#f0e2d8] bg-white p-6 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h3 className="text-[21px] font-extrabold tracking-[-0.04em] text-[#332d29]">
+                <h3 className="text-[21px] font-extrabold text-[#332d29]">
                   Состав поставки
                 </h3>
 
                 <p className="mt-1 text-[12px] text-[#988980]">
-                  Введите количество в кг, л или шт.
+                  Введите количество и цену за единицу
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={addProductRow}
-                className="rounded-xl bg-[#fff0df] px-4 py-2.5 text-[12px] font-bold text-[#d9671b] transition hover:bg-[#ffe2cb]"
+                className="rounded-xl bg-[#fff0df] px-4 py-2.5 text-[12px] font-bold text-[#d9671b]"
               >
                 + Добавить продукт
               </button>
             </div>
 
-            <div className="mb-3 grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_44px] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+            {productsError && (
+              <div className="mb-4 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+                {productsError}
+              </div>
+            )}
+
+            <div className="mb-3 grid grid-cols-[1.25fr_0.8fr_0.7fr_0.9fr_1fr_44px] gap-3 text-[10px] font-extrabold uppercase text-[#aa9b91]">
               <div>Продукт</div>
               <div>Количество</div>
               <div>Единица</div>
-              <div>Цена за единицу</div>
+              <div>Цена</div>
+              <div>Годен до</div>
               <div />
             </div>
 
@@ -347,12 +438,8 @@ function SupplyInput({ onAddDelivery }) {
               {deliveryProducts.map((deliveryProduct) => {
                 const selectedProduct = products.find(
                   (product) =>
-                    product.id === Number(deliveryProduct.productId),
+                    product.name === deliveryProduct.productName,
                 );
-
-                const unit = selectedProduct
-                  ? unitLabels[selectedProduct.unit]
-                  : "—";
 
                 const productCost =
                   calculateProductCost(deliveryProduct);
@@ -360,23 +447,30 @@ function SupplyInput({ onAddDelivery }) {
                 return (
                   <div
                     key={deliveryProduct.id}
-                    className="grid grid-cols-[1.4fr_0.8fr_0.8fr_1fr_44px] items-start gap-3"
+                    className="grid grid-cols-[1.25fr_0.8fr_0.7fr_0.9fr_1fr_44px] items-start gap-3"
                   >
                     <select
-                      value={deliveryProduct.productId}
+                      value={deliveryProduct.productName}
                       onChange={(event) =>
                         updateProductRow(
                           deliveryProduct.id,
-                          "productId",
+                          "productName",
                           event.target.value,
                         )
                       }
-                      className="h-11 rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] text-[#665850] focus:border-[#eb701c] focus:outline-none"
+                      disabled={
+                        isLoadingProducts || products.length === 0
+                      }
+                      className="h-11 rounded-xl border border-[#eaded5] bg-white px-3 text-[13px] focus:border-[#eb701c] focus:outline-none disabled:bg-[#f8f3ef]"
                     >
-                      <option value="">Выберите продукт</option>
+                      <option value="">
+                        {isLoadingProducts
+                          ? "Загрузка..."
+                          : "Выберите продукт"}
+                      </option>
 
                       {products.map((product) => (
-                        <option key={product.id} value={product.id}>
+                        <option key={product.name} value={product.name}>
                           {product.name}
                         </option>
                       ))}
@@ -385,11 +479,7 @@ function SupplyInput({ onAddDelivery }) {
                     <input
                       type="number"
                       min="0"
-                      step={
-                        selectedProduct?.unit === "Item"
-                          ? "1"
-                          : "0.01"
-                      }
+                      step="0.01"
                       value={deliveryProduct.amount}
                       onChange={(event) =>
                         updateProductRow(
@@ -399,63 +489,64 @@ function SupplyInput({ onAddDelivery }) {
                         )
                       }
                       placeholder="Количество"
-                      className="h-11 rounded-xl border border-[#eaded5] bg-[#fffdfb] px-3 text-[13px] placeholder:text-[#b5a69d] focus:border-[#eb701c] focus:outline-none"
+                      className="h-11 rounded-xl border border-[#eaded5] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
                     />
 
-                    <div className="flex h-11 items-center rounded-xl border border-[#eaded5] bg-[#fdf8f4] px-3 text-[13px] text-[#665850]">
-                      {unit}
+                    <div className="flex h-11 items-center rounded-xl border border-[#eaded5] bg-[#fdf8f4] px-3 text-[13px]">
+                      {selectedProduct
+                        ? getUnitLabel(selectedProduct.measureUnit)
+                        : "—"}
                     </div>
 
-                    <div>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={deliveryProduct.price}
-                        onChange={(event) =>
-                          updateProductRow(
-                            deliveryProduct.id,
-                            "price",
-                            event.target.value,
-                          )
-                        }
-                        placeholder="Цена"
-                        className="h-11 w-full rounded-xl border border-[#eaded5] bg-[#fffdfb] px-3 text-[13px] placeholder:text-[#b5a69d] focus:border-[#eb701c] focus:outline-none"
-                      />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={deliveryProduct.price}
+                      onChange={(event) =>
+                        updateProductRow(
+                          deliveryProduct.id,
+                          "price",
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Цена"
+                      className="h-11 rounded-xl border border-[#eaded5] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
+                    />
 
-                      {productCost > 0 && (
-                        <div className="mt-1 text-[10px] text-[#a09187]">
-                          Сумма: {formatMoney(productCost)}
-                        </div>
-                      )}
-                    </div>
+                    <input
+                      type="date"
+                      value={deliveryProduct.expirationDate}
+                      onChange={(event) =>
+                        updateProductRow(
+                          deliveryProduct.id,
+                          "expirationDate",
+                          event.target.value,
+                        )
+                      }
+                      className="h-11 rounded-xl border border-[#eaded5] px-3 text-[13px] focus:border-[#eb701c] focus:outline-none"
+                    />
 
                     <button
                       type="button"
-                      onClick={() =>
-                        removeProductRow(deliveryProduct.id)
-                      }
-                      aria-label="Удалить продукт из поставки"
-                      className="flex h-11 items-center justify-center rounded-xl bg-[#fff0df] text-[#d9671b] transition hover:bg-[#ffe0c2] hover:text-[#c84d45]"
+                      onClick={() => removeProductRow(deliveryProduct.id)}
+                      className="flex h-11 items-center justify-center rounded-xl bg-[#fff0df] text-[#d9671b]"
                     >
                       <MinusIcon />
                     </button>
+
+                    {productCost > 0 && (
+                      <div className="col-span-full text-right text-[11px] text-[#958278]">
+                        Стоимость позиции: {formatMoney(productCost)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="mt-6 flex justify-end border-t border-[#f3e8e0] pt-4">
-              <div className="text-[15px] font-extrabold text-[#493e38]">
-                Общая стоимость:{" "}
-                {formatMoney(
-                  deliveryProducts.reduce(
-                    (total, product) =>
-                      total + calculateProductCost(product),
-                    0,
-                  ),
-                )}
-              </div>
+            <div className="mt-6 flex justify-end border-t border-[#f3e8e0] pt-4 text-[15px] font-extrabold text-[#493e38]">
+              Общая стоимость: {formatMoney(totalPrice)}
             </div>
           </section>
 
@@ -465,20 +556,32 @@ function SupplyInput({ onAddDelivery }) {
             </div>
           )}
 
+          {success && (
+            <div className="mb-6 rounded-xl border border-[#b8dfb0] bg-[#e8f3e1] px-4 py-3 text-[13px] font-bold text-[#59874c]">
+              {success}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-xl border border-[#eaded5] px-5 py-3 text-[13px] font-bold text-[#85766d] transition hover:bg-white"
+              className="rounded-xl border border-[#eaded5] px-5 py-3 text-[13px] font-bold text-[#85766d]"
             >
               Очистить
             </button>
 
             <button
               type="submit"
-              className="rounded-xl bg-[#e96d1b] px-5 py-3 text-[13px] font-bold text-white shadow-[0_5px_12px_rgba(232,109,27,0.18)] transition hover:bg-[#d95e12]"
+              disabled={
+                isLoadingProducts ||
+                isLoadingSuppliers ||
+                products.length === 0 ||
+                suppliers.length === 0
+              }
+              className="rounded-xl bg-[#e96d1b] px-5 py-3 text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Добавить поставку
+              Создать поставку
             </button>
           </div>
         </form>
