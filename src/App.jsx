@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import DeliveriesHistory from "./pages/DeliveriesHistory";
@@ -6,11 +6,100 @@ import { initialDeliveries } from "./data/deliveries";
 import Warehouse from "./pages/Warehouse";
 import ContentEditor from "./pages/ContentEditor";
 import OrdersHistory from "./pages/OrdersHistory";
+import UsersManagement from "./pages/UsersManagement";
 import SupplyInput from "./pages/SupplyInput";
+import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
+
+const USERS_STORAGE_KEY = "warehouse.users";
+const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
+
+const INITIAL_USERS = [
+  {
+    id: "USR-0001",
+    name: "Администратор",
+    role: "admin",
+  },
+];
+
+function readUsers() {
+  try {
+    const savedUsers = localStorage.getItem(USERS_STORAGE_KEY);
+
+    if (!savedUsers) {
+      return INITIAL_USERS;
+    }
+
+    const parsedUsers = JSON.parse(savedUsers);
+
+    if (!Array.isArray(parsedUsers)) {
+      return INITIAL_USERS;
+    }
+
+    const validUsers = parsedUsers.filter(
+      (user) =>
+        user &&
+        typeof user.id === "string" &&
+        typeof user.name === "string" &&
+        ROLE_LABELS[user.role],
+    );
+
+    return validUsers.length > 0 ? validUsers : INITIAL_USERS;
+  } catch {
+    return INITIAL_USERS;
+  }
+}
+
+function readActiveUserId(users) {
+  try {
+    const savedId = localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
+
+    if (users.some((user) => user.id === savedId)) {
+      return savedId;
+    }
+  } catch {
+    // Если localStorage недоступен, используется первый пользователь.
+  }
+
+  return users[0]?.id ?? INITIAL_USERS[0].id;
+}
 
 function App() {
+  const [users, setUsers] = useState(readUsers);
+  const [activeUserId, setActiveUserId] = useState(() =>
+    readActiveUserId(readUsers()),
+  );
   const [activePage, setActivePage] = useState("Главная");
   const [deliveries, setDeliveries] = useState(initialDeliveries);
+
+  const currentUser =
+    users.find((user) => user.id === activeUserId) ??
+    users[0] ??
+    INITIAL_USERS[0];
+
+  const visiblePages = PAGE_ACCESS[currentUser.role] ?? ["Главная"];
+
+  const displayedPage = visiblePages.includes(activePage)
+    ? activePage
+    : (visiblePages[0] ?? "Главная");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    } catch {
+      // Приложение продолжит работать до перезагрузки страницы.
+    }
+  }, [users]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        ACTIVE_USER_STORAGE_KEY,
+        currentUser.id,
+      );
+    } catch {
+      // Переключение пользователя продолжит работать в текущей сессии.
+    }
+  }, [currentUser.id]);
 
   function addDelivery(newDelivery) {
     setDeliveries((currentDeliveries) => [
@@ -22,68 +111,97 @@ function App() {
   }
 
   function renderPage() {
-    if (activePage === "Главная") {
-      return <Dashboard />;
-    }
-
-    if (activePage === "История поставок") {
-      return <DeliveriesHistory deliveries={deliveries} />;
-    }
-
-    if (activePage === "Склад") {
-      return <Warehouse />;
-    }
-
-    if (activePage === "Редактор содержимого") {
-      return <ContentEditor />;
-    }
-
-    if (activePage === "История заказов") {
-      return <OrdersHistory />;
-    }
-
-    if (activePage === "Ввод поставок") {
-      return <SupplyInput onAddDelivery={addDelivery} />;
-    }
-
-    if (activePage === "Панель управления пользователями") {
+    if (!visiblePages.includes(displayedPage)) {
       return (
-        <PlaceholderPage title="Панель управления пользователями" />
+        <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
+          У вас нет доступа к этому разделу.
+        </div>
       );
     }
 
-    return <PlaceholderPage title={activePage} />;
+    switch (displayedPage) {
+      case "Главная":
+        return <Dashboard />;
+
+      case "История поставок":
+        return <DeliveriesHistory deliveries={deliveries} />;
+
+      case "Склад":
+        return <Warehouse />;
+
+      case "История заказов":
+        return <OrdersHistory />;
+
+      case "Редактор содержимого":
+        return <ContentEditor />;
+
+      case "Ввод поставок":
+        return <SupplyInput onAddDelivery={addDelivery} />;
+
+      case "Панель управления пользователями":
+        if (currentUser.role !== "admin") {
+          return (
+            <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
+              У вас нет доступа к панели управления пользователями.
+            </div>
+          );
+        }
+
+        return (
+          <UsersManagement
+            users={users}
+            onUsersChange={setUsers}
+            currentUserId={currentUser.id}
+          />
+        );
+
+      default:
+        return (
+          <section className="m-6 rounded-2xl border border-[#eee4dc] bg-white p-6 sm:m-8">
+            <h1 className="text-2xl font-bold text-[#45372f]">
+              Раздел панели управления
+            </h1>
+
+            <p className="mt-2 text-[#776960]">
+              {displayedPage}
+            </p>
+          </section>
+        );
+    }
+  }
+
+  function handleActiveUserChange(event) {
+    const nextUserId = event.target.value;
+    const nextUser = users.find((user) => user.id === nextUserId);
+
+    if (!nextUser) {
+      return;
+    }
+
+    setActiveUserId(nextUserId);
+
+    const nextPages = PAGE_ACCESS[nextUser.role] ?? ["Главная"];
+
+    if (!nextPages.includes(activePage)) {
+      setActivePage(nextPages[0] ?? "Главная");
+    }
   }
 
   return (
-    <div className="min-h-screen bg-[#fff8f1]">
+    <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
       <Sidebar
-        activePage={activePage}
+        activePage={displayedPage}
         onPageChange={setActivePage}
+        visiblePages={visiblePages}
+        currentUser={currentUser}
+        users={users}
+        onActiveUserChange={handleActiveUserChange}
       />
 
-      <div className="ml-[266px]">{renderPage()}</div>
-    </div>
-  );
-}
-
-function PlaceholderPage({ title }) {
-  return (
-    <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
-      <div className="rounded-[24px] bg-white p-8 shadow-[0_5px_18px_rgba(120,75,40,0.04)]">
-        <div className="mb-2 text-[12px] text-[#ad8e7a]">
-          Раздел панели управления
-        </div>
-
-        <h2 className="text-[32px] font-extrabold tracking-[-0.05em] text-[#332d29]">
-          {title}
-        </h2>
-
-        <p className="mt-3 text-[14px] text-[#958278]">
-          Страница будет добавлена следующим этапом.
-        </p>
+      <div className="min-w-0 flex-1">
+        <main>{renderPage()}</main>
       </div>
-    </main>
+    </div>
   );
 }
 
