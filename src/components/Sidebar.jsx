@@ -2,6 +2,7 @@ const menuItems = [
   { label: "Главная", icon: "◈" },
   { label: "История поставок", icon: "↗" },
   { label: "Склад", icon: "▤" },
+  { label: "Списания", icon: "−"},
   { label: "История заказов", icon: "▣" },
   { label: "Редактор содержимого", icon: "✎" },
   { label: "Ввод поставок", icon: "+" },

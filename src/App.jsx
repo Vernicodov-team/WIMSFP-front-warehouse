@@ -8,6 +8,7 @@ import OrdersHistory from "./pages/OrdersHistory";
 import UsersManagement from "./pages/UsersManagement";
 import SupplyInput from "./pages/SupplyInput";
 import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
+import WriteOffs from "./pages/WriteOffs";
 
 const USERS_STORAGE_KEY = "warehouse.users";
 const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
@@ -137,6 +138,9 @@ function App() {
             refreshKey={deliveriesRefreshKey}
           />
         );
+      
+      case "Списания":
+        return <WriteOffs />;
 
       case "Склад":
         return <Warehouse />;
