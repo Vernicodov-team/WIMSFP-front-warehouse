@@ -7,11 +7,14 @@ import ContentEditor from "./pages/ContentEditor";
 import OrdersHistory from "./pages/OrdersHistory";
 import UsersManagement from "./pages/UsersManagement";
 import SupplyInput from "./pages/SupplyInput";
-import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
 import WriteOffs from "./pages/WriteOffs";
+import Login from "./pages/Login";
+import { PAGE_ACCESS, ROLE_LABELS } from "./config/permissions";
 
 const USERS_STORAGE_KEY = "warehouse.users";
 const ACTIVE_USER_STORAGE_KEY = "warehouse.activeUserId";
+const AUTH_STORAGE_KEY = "warehouse.authenticated";
+const AUTH_USER_NAME_KEY = "warehouse.authUserName";
 
 const INITIAL_USERS = [
   {
@@ -36,11 +39,11 @@ function readUsers() {
     }
 
     const validUsers = parsedUsers.filter(
-      (user) =>
-        user &&
-        typeof user.id === "string" &&
-        typeof user.name === "string" &&
-        ROLE_LABELS[user.role],
+        (user) =>
+            user &&
+            typeof user.id === "string" &&
+            typeof user.name === "string" &&
+            ROLE_LABELS[user.role]
     );
 
     return validUsers.length > 0 ? validUsers : INITIAL_USERS;
@@ -67,24 +70,30 @@ function App() {
   const [users, setUsers] = useState(readUsers);
 
   const [activeUserId, setActiveUserId] = useState(() =>
-    readActiveUserId(readUsers()),
+      readActiveUserId(readUsers())
   );
 
   const [activePage, setActivePage] = useState("Главная");
-
-  // Меняется после успешного добавления поставки.
   const [deliveriesRefreshKey, setDeliveriesRefreshKey] = useState(0);
 
+  const [isAuthenticated, setIsAuthenticated] = useState(
+      () => localStorage.getItem(AUTH_STORAGE_KEY) === "true"
+  );
+
+  const [authenticatedUserName, setAuthenticatedUserName] = useState(
+      () => localStorage.getItem(AUTH_USER_NAME_KEY) || ""
+  );
+
   const currentUser =
-    users.find((user) => user.id === activeUserId) ??
-    users[0] ??
-    INITIAL_USERS[0];
+      users.find((user) => user.id === activeUserId) ??
+      users[0] ??
+      INITIAL_USERS[0];
 
   const visiblePages = PAGE_ACCESS[currentUser.role] ?? ["Главная"];
 
   const displayedPage = visiblePages.includes(activePage)
-    ? activePage
-    : (visiblePages[0] ?? "Главная");
+      ? activePage
+      : visiblePages[0] ?? "Главная";
 
   useEffect(() => {
     try {
@@ -96,35 +105,31 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        ACTIVE_USER_STORAGE_KEY,
-        currentUser.id,
-      );
+      localStorage.setItem(ACTIVE_USER_STORAGE_KEY, currentUser.id);
     } catch {
-      // Переключение работает в текущей сессии.
+      // Выбранный пользователь сохранится только в текущей сессии.
     }
   }, [currentUser.id]);
+
+  function handleLogin(userName) {
+    localStorage.setItem(AUTH_STORAGE_KEY, "true");
+    localStorage.setItem(AUTH_USER_NAME_KEY, userName);
+
+    setAuthenticatedUserName(userName);
+    setIsAuthenticated(true);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(AUTH_USER_NAME_KEY);
+
+    setAuthenticatedUserName("");
+    setIsAuthenticated(false);
+  }
 
   function handleDeliveryCreated() {
     setDeliveriesRefreshKey((currentKey) => currentKey + 1);
     setActivePage("История поставок");
-  }
-
-  function handleActiveUserChange(event) {
-    const nextUserId = event.target.value;
-    const nextUser = users.find((user) => user.id === nextUserId);
-
-    if (!nextUser) {
-      return;
-    }
-
-    setActiveUserId(nextUserId);
-
-    const nextPages = PAGE_ACCESS[nextUser.role] ?? ["Главная"];
-
-    if (!nextPages.includes(activePage)) {
-      setActivePage(nextPages[0] ?? "Главная");
-    }
   }
 
   function renderPage() {
@@ -133,12 +138,8 @@ function App() {
         return <Dashboard />;
 
       case "История поставок":
-        return (
-          <DeliveriesHistory
-            refreshKey={deliveriesRefreshKey}
-          />
-        );
-      
+        return <DeliveriesHistory refreshKey={deliveriesRefreshKey} />;
+
       case "Списания":
         return <WriteOffs />;
 
@@ -152,59 +153,57 @@ function App() {
         return <ContentEditor />;
 
       case "Ввод поставок":
-        return (
-          <SupplyInput
-            onAddDelivery={handleDeliveryCreated}
-          />
-        );
+        return <SupplyInput onAddDelivery={handleDeliveryCreated} />;
 
       case "Панель управления пользователями":
         if (currentUser.role !== "admin") {
           return (
-            <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
-              У вас нет доступа к панели управления пользователями.
-            </div>
+              <div className="m-6 rounded-xl bg-white p-6 text-[#776960] sm:m-8">
+                У вас нет доступа к панели управления пользователями.
+              </div>
           );
         }
 
         return (
-          <UsersManagement
-            users={users}
-            onUsersChange={setUsers}
-            currentUserId={currentUser.id}
-          />
+            <UsersManagement
+                users={users}
+                onUsersChange={setUsers}
+                currentUserId={currentUser.id}
+            />
         );
 
       default:
         return (
-          <section className="m-6 rounded-2xl border border-[#eee4dc] bg-white p-6 sm:m-8">
-            <h1 className="text-2xl font-bold text-[#45372f]">
-              Раздел панели управления
-            </h1>
-
-            <p className="mt-2 text-[#776960]">
-              {displayedPage}
-            </p>
-          </section>
+            <section className="m-6 rounded-2xl border border-[#eee4dc] bg-white p-6 sm:m-8">
+              <h1 className="text-2xl font-bold text-[#45372f]">
+                Раздел панели управления
+              </h1>
+              <p className="mt-2 text-[#776960]">{displayedPage}</p>
+            </section>
         );
     }
   }
 
-  return (
-    <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
-      <Sidebar
-        activePage={displayedPage}
-        onPageChange={setActivePage}
-        visiblePages={visiblePages}
-        currentUser={currentUser}
-        users={users}
-        onActiveUserChange={handleActiveUserChange}
-      />
+  if (!isAuthenticated) {
+    return <Login onSuccess={handleLogin} />;
+  }
 
-      <div className="min-w-0 flex-1">
-        <main>{renderPage()}</main>
+  return (
+      <div className="min-h-screen bg-[#f8f5f2] text-[#45372f] md:flex">
+        <Sidebar
+            activePage={displayedPage}
+            onPageChange={setActivePage}
+            visiblePages={visiblePages}
+            currentUser={currentUser}
+            userName={authenticatedUserName || currentUser.name}
+            userRole={ROLE_LABELS[currentUser.role] ?? currentUser.role}
+            onLogout={handleLogout}
+        />
+
+        <div className="min-w-0 flex-1 md:ml-64">
+          <main>{renderPage()}</main>
+        </div>
       </div>
-    </div>
   );
 }
 
