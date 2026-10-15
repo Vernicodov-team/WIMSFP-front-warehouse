@@ -1,114 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const warehouseProducts = [
-  {
-    name: "Яйца",
-    sumAmount: 140,
-    firstExpired: "2026-10-19T09:39:25.488Z",
-    lastDelivery: "2026-10-14T09:39:25.488Z",
-    unit: "Item",
-    stocks: [
-      {
-        productType: "Яйца",
-        amount: 140,
-        dateExpired: "2026-10-19T09:39:25.488Z",
-        dateReceived: "2026-10-14T09:39:25.488Z",
-        status: "Active",
-      },
-    ],
-  },
-  {
-    name: "Мясо",
-    sumAmount: 45,
-    firstExpired: "2026-10-16T12:27:09.764Z",
-    lastDelivery: "2026-10-13T12:27:09.764Z",
-    unit: "Kilogram",
-    stocks: [
-      {
-        productType: "Мясо",
-        amount: 15,
-        dateExpired: "2026-10-16T12:27:09.764Z",
-        dateReceived: "2026-10-13T12:27:09.764Z",
-        status: "Active",
-      },
-      {
-        productType: "Мясо",
-        amount: 15,
-        dateExpired: "2026-10-18T12:27:09.764Z",
-        dateReceived: "2026-10-13T12:27:09.764Z",
-        status: "Active",
-      },
-      {
-        productType: "Мясо",
-        amount: 15,
-        dateExpired: "2026-10-21T12:27:09.764Z",
-        dateReceived: "2026-10-13T12:27:09.764Z",
-        status: "Spent",
-      },
-    ],
-  },
-  {
-    name: "Рис",
-    sumAmount: 75,
-    firstExpired: "2026-10-17T12:27:09.764Z",
-    lastDelivery: "2026-10-12T12:27:09.764Z",
-    unit: "Kilogram",
-    stocks: [
-      {
-        productType: "Рис",
-        amount: 45,
-        dateExpired: "2026-10-19T12:27:09.764Z",
-        dateReceived: "2026-10-12T12:27:09.764Z",
-        status: "Active",
-      },
-      {
-        productType: "Рис",
-        amount: 30,
-        dateExpired: "2026-10-17T12:27:09.764Z",
-        dateReceived: "2026-10-12T12:27:09.764Z",
-        status: "Expired",
-      },
-    ],
-  },
-  {
-    name: "Молоко",
-    sumAmount: 20,
-    firstExpired: "2026-10-18T12:27:09.764Z",
-    lastDelivery: "2026-10-13T12:27:09.764Z",
-    unit: "Liter",
-    stocks: [
-      {
-        productType: "Молоко",
-        amount: 20,
-        dateExpired: "2026-10-18T12:27:09.764Z",
-        dateReceived: "2026-10-13T12:27:09.764Z",
-        status: "Active",
-      },
-    ],
-  },
-  {
-    name: "Томаты",
-    sumAmount: 28,
-    firstExpired: "2026-10-15T12:27:09.764Z",
-    lastDelivery: "2026-10-12T12:27:09.764Z",
-    unit: "Kilogram",
-    stocks: [
-      {
-        productType: "Томаты",
-        amount: 28,
-        dateExpired: "2026-10-15T12:27:09.764Z",
-        dateReceived: "2026-10-12T12:27:09.764Z",
-        status: "Decommissioned",
-      },
-    ],
-  },
-];
-
-const unitTranslations = {
-  Item: "шт.",
-  Kilogram: "кг",
-  Liter: "л",
-};
+const API_URL = "http://localhost:5094/api/v1";
 
 const statusConfig = {
   Active: {
@@ -127,6 +19,15 @@ const statusConfig = {
     label: "Израсходовано",
     className: "bg-[#fff0c9] text-[#b8791b]",
   },
+};
+
+const unitLabels = {
+  Item: "шт.",
+  item: "шт.",
+  Kilogram: "кг",
+  kilogram: "кг",
+  Liter: "л",
+  liter: "л",
 };
 
 function SearchIcon() {
@@ -168,50 +69,134 @@ function ClearIcon() {
 }
 
 function formatDate(date) {
+  if (!date) {
+    return "—";
+  }
+
   return new Date(date).toLocaleDateString("ru-RU");
 }
 
-function getDaysUntilExpiration(date) {
-  const today = new Date("2026-10-14T00:00:00");
-  const expirationDate = new Date(date);
-  const difference = expirationDate.getTime() - today.getTime();
-
-  return Math.ceil(difference / (1000 * 60 * 60 * 24));
+function normalizeUnit(unit) {
+  return unitLabels[unit] || unit || "—";
 }
 
-function getExpirationClass(date) {
-  const daysUntilExpiration = getDaysUntilExpiration(date);
+function getDaysUntilExpiration(date) {
+  if (!date) {
+    return null;
+  }
 
-  if (daysUntilExpiration < 0) {
+  const today = new Date();
+  const expirationDate = new Date(date);
+  const difference =
+    expirationDate.getTime() - today.getTime();
+
+  return Math.ceil(
+    difference / (1000 * 60 * 60 * 24),
+  );
+}
+
+function getDaysClass(days) {
+  if (days === null) {
+    return "text-[#85766d]";
+  }
+
+  if (days < 0) {
     return "text-[#c84d45]";
   }
 
-  if (daysUntilExpiration <= 3) {
+  if (days <= 3) {
+    return "text-[#b8791b]";
+  }
+
+  return "text-[#59874c]";
+}
+
+function getExpirationClass(date) {
+  const days = getDaysUntilExpiration(date);
+
+  if (days === null) {
+    return "text-[#85766d]";
+  }
+
+  if (days < 0) {
+    return "text-[#c84d45]";
+  }
+
+  if (days <= 3) {
     return "text-[#b8791b]";
   }
 
   return "text-[#665850]";
 }
 
-function getUnitLabel(unit) {
-  return unitTranslations[unit] || unit;
+function getStatusConfig(status) {
+  return (
+    statusConfig[status] || {
+      label: status || "Неизвестно",
+      className: "bg-[#eee9e5] text-[#81746e]",
+    }
+  );
 }
 
 function Warehouse() {
+  const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [expandedProduct, setExpandedProduct] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadProducts() {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_URL}/Stock/Sum`);
+
+      if (!response.ok) {
+        throw new Error(
+          `Ошибка загрузки склада: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          "Бэкенд вернул некорректный список остатков.",
+        );
+      }
+
+      setProducts(data);
+    } catch (requestError) {
+      setProducts([]);
+
+      setError(
+        requestError.message ||
+          "Не удалось загрузить данные склада.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadProducts();
+  }, []);
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return warehouseProducts;
+      return products;
     }
 
-    return warehouseProducts.filter((product) =>
-      product.name.toLowerCase().includes(normalizedSearch),
+    return products.filter((product) =>
+      String(product.name || "")
+        .toLowerCase()
+        .includes(normalizedSearch),
     );
-  }, [search]);
+  }, [products, search]);
 
   function toggleProduct(productName) {
     setExpandedProduct((currentProduct) =>
@@ -222,15 +207,31 @@ function Warehouse() {
   return (
     <main className="min-h-screen bg-[#fff8f1] px-8 py-8">
       <div className="mx-auto max-w-[1500px]">
-        <header className="mb-8">
-          <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
-            Склад
-          </h2>
+        <header className="mb-8 flex items-end justify-between">
+          <div>
+            <h2 className="text-[38px] font-extrabold tracking-[-0.06em] text-[#302a27]">
+              Склад
+            </h2>
 
-          <p className="mt-2 text-[14px] text-[#958278]">
-            Текущие остатки продуктов и сроки годности
-          </p>
+            <p className="mt-2 text-[14px] text-[#958278]">
+              Текущие остатки продуктов и сроки годности
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadProducts}
+            className="rounded-xl bg-[#fff0df] px-4 py-2.5 text-[12px] font-bold text-[#d9671b] transition hover:bg-[#ffe2cb]"
+          >
+            Обновить данные
+          </button>
         </header>
+
+        {error && (
+          <div className="mb-5 rounded-xl border border-[#f2b8b2] bg-[#ffe1dd] px-4 py-3 text-[13px] font-bold text-[#c84d45]">
+            {error}
+          </div>
+        )}
 
         <section className="mb-5 rounded-[20px] border border-[#f0e2d8] bg-white p-5">
           <div className="relative">
@@ -259,7 +260,9 @@ function Warehouse() {
           </div>
 
           <div className="mt-3 text-[12px] text-[#a09187]">
-            Найдено продуктов: {filteredProducts.length}
+            {isLoading
+              ? "Загрузка остатков..."
+              : `Найдено продуктов: ${filteredProducts.length}`}
           </div>
         </section>
 
@@ -273,14 +276,20 @@ function Warehouse() {
             <div />
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {isLoading ? (
+            <div className="p-10 text-center text-[14px] text-[#958278]">
+              Загружаем данные склада...
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="p-10 text-center text-[14px] text-[#958278]">
               Продукты не найдены.
             </div>
           ) : (
             filteredProducts.map((product) => {
-              const isExpanded = expandedProduct === product.name;
-              const unitLabel = getUnitLabel(product.unit);
+              const isExpanded =
+                expandedProduct === product.name;
+
+              const unit = normalizeUnit(product.unit);
 
               return (
                 <div key={product.name}>
@@ -294,10 +303,12 @@ function Warehouse() {
                     </span>
 
                     <span className="font-bold text-[#665850]">
-                      {product.sumAmount}
+                      {product.sumAmount ?? 0}
                     </span>
 
-                    <span className="text-[#85766d]">{unitLabel}</span>
+                    <span className="text-[#85766d]">
+                      {unit}
+                    </span>
 
                     <span
                       className={`font-bold ${getExpirationClass(
@@ -330,48 +341,75 @@ function Warehouse() {
                         Поставки продукта: {product.name}
                       </div>
 
-                      <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
+                      <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.9fr_1fr] gap-3 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[#aa9b91]">
                         <div>Продукт</div>
                         <div>Количество</div>
-                        <div>Единица</div>
-                        <div>Поступил</div>
+                        <div>Получен</div>
                         <div>Годен до</div>
+                        <div>Дней до истечения</div>
                         <div>Статус</div>
                       </div>
 
-                      {product.stocks.map((stock, index) => {
-                        const status = statusConfig[stock.status] || {
-                          label: "Неизвестно",
-                          className: "bg-[#eee9e5] text-[#81746e]",
-                        };
+                      {Array.isArray(product.stocks) &&
+                        product.stocks.map((stock, index) => {
+                          const status = getStatusConfig(
+                            stock.status,
+                          );
 
-                        return (
-                          <div
-                            key={`${stock.dateReceived}-${stock.dateExpired}-${index}`}
-                            className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_1fr_1fr] items-center gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
-                          >
-                            <div className="font-bold text-[#493e38]">
-                              {stock.productType}
-                            </div>
+                          const daysUntilExpiration =
+                            stock.daysUntilExpiration ??
+                            getDaysUntilExpiration(
+                              stock.dateExpired,
+                            );
 
-                            <div>{stock.amount}</div>
+                          return (
+                            <div
+                              key={`${product.name}-${index}`}
+                              className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_0.9fr_1fr] items-center gap-3 border-t border-[#f1e5dd] py-3 text-[12px] text-[#766960]"
+                            >
+                              <div className="font-bold text-[#493e38]">
+                                {stock.productType ||
+                                  product.name}
+                              </div>
 
-                            <div>{unitLabel}</div>
+                              <div>
+                                {stock.amount ?? 0} {unit}
+                              </div>
 
-                            <div>{formatDate(stock.dateReceived)}</div>
+                              <div>
+                                {formatDate(stock.dateReceived)}
+                              </div>
 
-                            <div>{formatDate(stock.dateExpired)}</div>
-
-                            <div>
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}
+                              <div
+                                className={getExpirationClass(
+                                  stock.dateExpired,
+                                )}
                               >
-                                {status.label}
-                              </span>
+                                {formatDate(stock.dateExpired)}
+                              </div>
+
+                              <div
+                                className={`font-bold ${getDaysClass(
+                                  daysUntilExpiration,
+                                )}`}
+                              >
+                                {daysUntilExpiration === null
+                                  ? "—"
+                                  : daysUntilExpiration < 0
+                                    ? "Просрочено"
+                                    : `${daysUntilExpiration} дн.`}
+                              </div>
+
+                              <div>
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}
+                                >
+                                  {status.label}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   )}
                 </div>
