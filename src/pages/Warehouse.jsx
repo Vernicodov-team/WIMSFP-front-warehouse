@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiFetch } from "../api/client";
 
 const statusConfig = {
   Active: {
@@ -150,7 +149,7 @@ function Warehouse({ refreshKey }) {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch(`${API_URL}/Stock/Sum`);
+      const response = await apiFetch("/api/v1/Stock/Sum");
 
       if (!response.ok) {
         throw new Error(

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiFetch } from "../api/client";
 
 const unitLabels = {
   item: "шт.",
@@ -70,7 +69,7 @@ function SupplyInput({ onAddDelivery }) {
   useEffect(() => {
     async function loadProducts() {
       try {
-        const response = await fetch(`${API_URL}/Products`);
+        const response = await apiFetch("/api/v1/Products");
 
         if (!response.ok) {
           throw new Error(`Ошибка загрузки продуктов: ${response.status}`);
@@ -98,7 +97,7 @@ function SupplyInput({ onAddDelivery }) {
   useEffect(() => {
     async function loadSuppliers() {
       try {
-        const response = await fetch(`${API_URL}/Suppliers`);
+        const response = await apiFetch("/api/v1/Suppliers");
 
         if (!response.ok) {
           throw new Error(`Ошибка загрузки поставщиков: ${response.status}`);
@@ -252,11 +251,10 @@ function SupplyInput({ onAddDelivery }) {
     };
 
     try {
-      const response = await fetch(`${API_URL}/supply/AddDelivery`, {
+      const response = await apiFetch("/api/v1/supply/AddDelivery", {
         method: "POST",
         headers: {
           Accept: "*/*",
-          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });

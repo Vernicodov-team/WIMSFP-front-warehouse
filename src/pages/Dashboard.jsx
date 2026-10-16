@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiRequest } from "../api/client";
 
 const MONTHS_SHORT = [
   "янв.",
@@ -173,37 +172,6 @@ function pluralizePosition(count) {
   return "позиций";
 }
 
-async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      ...(options.body
-        ? { "Content-Type": "application/json" }
-        : {}),
-      ...options.headers,
-    },
-  });
-
-  const text = await response.text();
-
-  if (!response.ok) {
-    throw new Error(text || `Ошибка API: ${response.status}`);
-  }
-
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
 function getList(data) {
   if (Array.isArray(data)) {
     return data;
@@ -255,7 +223,7 @@ function Dashboard({ refreshKey }) {
         setFinancesLoading(true);
 
         const data = await apiRequest(
-          "/dashboard/FinanceAnalitics",
+          "/api/v1/dashboard/FinanceAnalitics",
         );
 
         if (isActive) {
@@ -291,7 +259,7 @@ function Dashboard({ refreshKey }) {
         setDecommisLoading(true);
 
         const data = await apiRequest(
-          "/dashboard/DecommisStock",
+          "/api/v1/dashboard/DecommisStock",
         );
 
         if (isActive) {
@@ -323,7 +291,7 @@ function Dashboard({ refreshKey }) {
         setTopDishesLoading(true);
 
         const data = await apiRequest(
-          "/dashboard/TopDishes",
+          "/api/v1/dashboard/TopDishes",
         );
 
         if (isActive) {
@@ -355,8 +323,8 @@ function Dashboard({ refreshKey }) {
         setCountsLoading(true);
 
         const [expired, expiring] = await Promise.all([
-          apiRequest("/dashboard/GetExpiredCount"),
-          apiRequest("/dashboard/GetExpiredSoonCount"),
+          apiRequest("/api/v1/dashboard/GetExpiredCount"),
+          apiRequest("/api/v1/dashboard/GetExpiredSoonCount"),
         ]);
 
         if (isActive) {
@@ -390,7 +358,7 @@ function Dashboard({ refreshKey }) {
         setRecoLoading(true);
 
         const data = await apiRequest(
-          "/dashboard/forecast/deliveryRecomend",
+          "/api/v1/dashboard/forecast/deliveryRecomend",
         );
 
         if (isActive) {
@@ -426,7 +394,7 @@ function Dashboard({ refreshKey }) {
         setStoplistLoading(true);
 
         const data = await apiRequest(
-          "/dashboard/forecast/stoplist",
+          "/api/v1/dashboard/forecast/stoplist",
         );
 
         if (isActive) {
@@ -462,7 +430,7 @@ function Dashboard({ refreshKey }) {
         setExpiredSoonLoading(true);
 
         const data = await apiRequest(
-          "/Stock/getExpiredSoon",
+          "/api/v1/Stock/getExpiredSoon",
         );
 
         if (isActive) {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiFetch } from "../api/client";
 
 function formatDate(date) {
   if (!date) {
@@ -132,8 +131,8 @@ function DeliveriesHistory({ refreshKey }) {
         setIsLoading(true);
         setError("");
 
-        const response = await fetch(
-          `${API_URL}/supply/GetDeliveries`,
+        const response = await apiFetch(
+          "/api/v1/supply/GetDeliveries",
         );
 
         if (!response.ok) {

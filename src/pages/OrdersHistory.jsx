@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiFetch } from "../api/client";
 
 const orderStatusConfig = {
   Completed: {
@@ -152,8 +151,8 @@ function OrdersHistory({ refreshKey }) {
         setIsLoading(true);
         setError("");
 
-        const response = await fetch(
-          `${API_URL}/order/getOrderList`,
+        const response = await apiFetch(
+          "/api/v1/order/getOrderList",
         );
 
         if (!response.ok) {
@@ -210,8 +209,8 @@ function OrdersHistory({ refreshKey }) {
 
     async function loadFinance() {
       try {
-        const response = await fetch(
-          `${API_URL}/dashboard/FinanceAnalitics`,
+        const response = await apiFetch(
+          "/api/v1/dashboard/FinanceAnalitics",
         );
 
         if (!response.ok) {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
-const API_URL = "http://localhost:5094/api/v1";
+import { apiFetch } from "../api/client";
 
 function formatDate(date) {
   if (!date) {
@@ -24,8 +23,8 @@ function WriteOffs({ refreshKey }) {
       setError("");
       setSuccess("");
 
-      const response = await fetch(
-        `${API_URL}/Stock/GetExpiredStoks`,
+      const response = await apiFetch(
+        "/api/v1/Stock/GetExpiredStoks",
       );
 
       if (!response.ok) {
@@ -88,8 +87,8 @@ function WriteOffs({ refreshKey }) {
       setError("");
       setSuccess("");
 
-      const response = await fetch(
-        `${API_URL}/Stock/WriteOffStock/${stockId}`,
+      const response = await apiFetch(
+        `/api/v1/Stock/WriteOffStock/${stockId}`,
         {
           method: "DELETE",
           headers: {

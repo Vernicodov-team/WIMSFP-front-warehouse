@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiRequest } from "../api/client";
 
 const unitTranslations = {
   Item: "шт.",
@@ -8,32 +9,6 @@ const unitTranslations = {
   kilogram: "кг",
   liter: "л",
 };
-
-async function apiRequest(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers,
-    },
-  });
-
-  const text = await response.text();
-
-  if (!response.ok) {
-    throw new Error(text || `Ошибка API: ${response.status}`);
-  }
-
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
 
 function getValue(object, ...names) {
   for (const name of names) {

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../api/client";
 import { ROLE_LABELS } from "../config/permissions";
-
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5094")
-    .replace(/\/+$/, "");
 
 function getArrayFromResponse(result, keys = []) {
     if (Array.isArray(result)) return result;
@@ -103,10 +101,8 @@ function UsersManagement({ authToken, currentUserName, refreshKey }) {
         setError("");
 
         try {
-            const response = await fetch(`${API_URL}/api/v1/user/getUsers`, {
-                headers: authToken
-                    ? { Authorization: `Bearer ${authToken}` }
-                    : {},
+            const response = await apiFetch("/api/v1/user/getUsers", {
+                headers: authHeaders,
             });
 
             const result = await readResponse(response);
@@ -136,10 +132,8 @@ function UsersManagement({ authToken, currentUserName, refreshKey }) {
 
     const loadRoles = useCallback(async () => {
         try {
-            const response = await fetch(`${API_URL}/api/v1/user/getRoles`, {
-                headers: authToken
-                    ? { Authorization: `Bearer ${authToken}` }
-                    : {},
+            const response = await apiFetch("/api/v1/user/getRoles", {
+                headers: authHeaders,
             });
 
             const result = await readResponse(response);
@@ -206,7 +200,7 @@ function UsersManagement({ authToken, currentUserName, refreshKey }) {
         setIsSaving(true);
 
         try {
-            const response = await fetch(`${API_URL}/api/v1/user/createUser`, {
+            const response = await apiFetch("/api/v1/user/createUser", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -256,8 +250,8 @@ function UsersManagement({ authToken, currentUserName, refreshKey }) {
         setDeletingUserName(user.name);
 
         try {
-            const response = await fetch(
-                `${API_URL}/api/v1/user/deleteUser/${encodeURIComponent(user.name)}`,
+            const response = await apiFetch(
+                `/api/v1/user/deleteUser/${encodeURIComponent(user.name)}`,
                 {
                     method: "DELETE",
                     headers: authHeaders,
