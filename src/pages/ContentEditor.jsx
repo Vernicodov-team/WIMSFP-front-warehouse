@@ -198,7 +198,7 @@ function MinusIcon() {
   );
 }
 
-function ContentEditor() {
+function ContentEditor({ refreshKey }) {
   const [activeSection, setActiveSection] = useState("products");
   const [products, setProducts] = useState([]);
   const [isAddDishOpen, setIsAddDishOpen] = useState(false);
@@ -266,7 +266,7 @@ function ContentEditor() {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   async function addProduct(product) {
     setSaving(true);

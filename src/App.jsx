@@ -197,7 +197,7 @@ function App() {
       case "История заказов":
         return <OrdersHistory refreshKey={dataRefreshKey} />;
       case "Редактор содержимого":
-        return <ContentEditor />;
+        return <ContentEditor refreshKey={dataRefreshKey} />;
       case "Ввод поставок":
         return <SupplyInput onAddDelivery={handleDeliveryCreated} />;
       case "Панель управления пользователями":
@@ -213,6 +213,7 @@ function App() {
           <UsersManagement
             authToken={authToken}
             currentUserName={authenticatedUser?.name}
+            refreshKey={dataRefreshKey}
           />
         );
       default:

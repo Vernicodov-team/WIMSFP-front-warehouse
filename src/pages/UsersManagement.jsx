@@ -83,7 +83,7 @@ function normalizeRoleOption(role) {
     return "";
 }
 
-function UsersManagement({ authToken, currentUserName }) {
+function UsersManagement({ authToken, currentUserName, refreshKey }) {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [name, setName] = useState("");
@@ -180,7 +180,7 @@ function UsersManagement({ authToken, currentUserName }) {
     useEffect(() => {
         loadUsers();
         loadRoles();
-    }, [loadUsers, loadRoles]);
+    }, [loadUsers, loadRoles, refreshKey]);
 
     async function addUser(event) {
         event.preventDefault();
